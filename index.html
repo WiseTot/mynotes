@@ -290,7 +290,8 @@
 
   /* ---------- Карты ---------- */
   .mview { position: relative; flex: 1; overflow: hidden; display: flex; flex-direction: column; }
-  .m-tools { position: absolute; left: 12px; right: 12px; top: 0; z-index: 3; display: flex; align-items: center; gap: 6px; padding: 6px; border-radius: 14px; }
+  .m-tools { position: absolute; left: 12px; right: 12px; top: 0; z-index: 3; display: flex; align-items: center; gap: 6px; padding: 6px; border-radius: 14px;
+    background: linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.02)), rgba(14,16,26,.9); } /* плотный фон: карточки под панелью не просвечивают */
   .m-tools select, .m-tools button {
     height: 30px; border-radius: 9px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.07); color: #fff;
     font: inherit; font-size: 13px; padding: 0 10px; cursor: pointer; transition: background .15s; white-space: nowrap; flex: none;

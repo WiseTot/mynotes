@@ -72,7 +72,9 @@
   }
 
   // ---------- Google: вход и файлы в скрытой папке приложения ----------
-  let access = sessionStorage.getItem('gtok') || '', accessExp = +sessionStorage.getItem('gexp') || 0, interactive = false;
+  // пропуск от Google живёт час; храним его, чтобы при повторном открытии в течение часа не входить заново
+let access = localStorage.getItem('gtok') || '', accessExp = +localStorage.getItem('gexp') || 0, interactive = false;
+const dropToken = () => { access = ''; accessExp = 0; localStorage.removeItem('gtok'); localStorage.removeItem('gexp'); };
   const connected = () => localStorage.getItem('gconnected') === '1';
   const loadGis = () => new Promise((res, rej) => {
     if (window.google?.accounts?.oauth2) return res();
@@ -89,13 +91,16 @@
         callback: r => {
           if (r.error) return rej(new Error(r.error));
           access = r.access_token; accessExp = Date.now() + (r.expires_in - 60) * 1000;
-          sessionStorage.setItem('gtok', access); sessionStorage.setItem('gexp', accessExp);
+          localStorage.setItem('gtok', access); localStorage.setItem('gexp', accessExp);
           localStorage.setItem('gconnected', '1');
+          // запомнить почту — в следующий раз Google не спрашивает, какой аккаунт, окно мелькнёт и закроется само
+          if (!localStorage.getItem('ghint')) fetch('https://www.googleapis.com/drive/v3/about?fields=user(emailAddress)', { headers: { Authorization: 'Bearer ' + access } })
+            .then(x => x.ok ? x.json() : null).then(j => j?.user?.emailAddress && localStorage.setItem('ghint', j.user.emailAddress)).catch(() => {});
           res(access);
         },
         error_callback: e => rej(new Error(e.type === 'popup_closed' ? 'cancelled' : e.type || 'popup')),
       });
-      client.requestAccessToken({ prompt: connected() ? '' : 'consent' });
+      client.requestAccessToken({ prompt: connected() ? '' : 'consent', login_hint: localStorage.getItem('ghint') || undefined });
     });
   }
   async function token() {
@@ -107,7 +112,7 @@
     let r;
     try { r = await fetch(url, { ...opts, headers: { ...opts.headers, Authorization: 'Bearer ' + await token() } }); }
     catch (e) { if (/auth-expired|cancelled|popup/.test(e.message)) throw e; throw new Error('offline'); }
-    if (r.status === 401) { access = ''; sessionStorage.removeItem('gtok'); throw new Error('auth-expired'); }
+    if (r.status === 401) { dropToken(); throw new Error('auth-expired'); }
     if (!r.ok) {
       let msg = '';
       try { msg = (await r.json()).error.message || ''; } catch {}
@@ -168,12 +173,14 @@
     await ready;
     if (!isConnected()) return { connected: false };
     const out = (await C.status(local(), sync.base, null)).out;
-    if (!testCloud && !(access && Date.now() < accessExp)) return { connected: false, expired: true, out }; // вход по кнопке
+    // пропуск истёк: не пугаем «войди заново» — «Загрузить» сам быстро возьмёт новый пропуск (окно Google мелькнёт и закроется)
+    const relogin = { connected: true, out, inc: '↻' };
+    if (!testCloud && !(access && Date.now() < accessExp)) return relogin;
     try {
       if (refresh || Date.now() - cloudAt > 60000) { cloudCache = await prov().read(); cloudAt = Date.now(); }
       return { connected: true, ...await C.status(local(), sync.base, cloudCache) };
     } catch (e) {
-      if (/auth-expired/.test(e.message)) return { connected: false, expired: true, out };
+      if (/auth-expired/.test(e.message)) return relogin;
       if (/password/.test(e.message)) return { connected: true, password: e.message, out };
       if (/^drive-/.test(e.message)) return { connected: true, failed: e.message, out };
       return { connected: true, offline: true, error: e.message, out };
@@ -221,7 +228,7 @@
     'sync-connect': async () => { try { interactive = true; await requestToken(); cloudAt = 0; return { ok: true }; } catch (e) { return { error: e.message }; } finally { interactive = false; } },
     'sync-disconnect': async () => {
       if (access && window.google?.accounts?.oauth2) google.accounts.oauth2.revoke(access, () => {});
-      access = ''; accessExp = 0; sessionStorage.removeItem('gtok'); localStorage.removeItem('gconnected'); cloudCache = null;
+      dropToken(); localStorage.removeItem('gconnected'); localStorage.removeItem('ghint'); cloudCache = null;
       return { ok: true };
     },
     'sync-password': async ({ password: p, rewrite } = {}) => {
