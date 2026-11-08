@@ -4,6 +4,16 @@
 // У видео: название, тайм-коды (клик — перемотка), фрагменты (✂ начало → ✂ конец = отдельная карточка),
 // «чистый вид» без интерфейса YouTube со своей маленькой панелью.
 
+// шрифты, которые есть в любой Windows 10/11 (на телефоне — похожие системные); общие для карт и заметок
+const FONTS = {
+  sans: ['Обычный', '"Segoe UI Variable Text","Segoe UI",sans-serif'],
+  serif: ['С засечками', 'Georgia,"Times New Roman",serif'],
+  wide: ['Строгий', 'Bahnschrift,"Segoe UI",sans-serif'],
+  mono: ['Моноширинный', 'Consolas,"Cascadia Mono",monospace'],
+  hand: ['Рукописный', '"Segoe Print","Ink Free",cursive'],
+  script: ['Каллиграфия', '"Segoe Script",Gabriola,cursive'],
+};
+
 function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
   root.innerHTML = `<div class="mview">
     <div class="m-stage">
@@ -57,15 +67,6 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
   q('.e-cols').innerHTML = ECOL.map((c, i) => `<i data-c="${i}" style="--c:${c}" title="Цвет ветки"></i>`).join('');
   const colorIdx = e => Math.max(0, ECOL.indexOf(e.color));
   const popEl = q('.m-pop'), selEl = q('.m-sel'), emptyEl = q('.m-empty'), fmtEl = q('.m-fmt');
-  // шрифты, которые есть в любой Windows 10/11
-  const FONTS = {
-    sans: ['Обычный', '"Segoe UI Variable Text","Segoe UI",sans-serif'],
-    serif: ['С засечками', 'Georgia,"Times New Roman",serif'],
-    wide: ['Строгий', 'Bahnschrift,"Segoe UI",sans-serif'],
-    mono: ['Моноширинный', 'Consolas,"Cascadia Mono",monospace'],
-    hand: ['Рукописный', '"Segoe Print","Ink Free",cursive'],
-    script: ['Каллиграфия', '"Segoe Script",Gabriola,cursive'],
-  };
   fmtEl.querySelector('.ffont').innerHTML = Object.entries(FONTS).map(([k, [name, css]]) => `<option value="${k}" style="font-family:${css.replace(/"/g, '&quot;')}">${name}</option>`).join('');
   const ICON = {
     note: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l4 4v14H6z"/><path d="M9 11h7M9 15h7"/></svg>',

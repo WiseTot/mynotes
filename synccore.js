@@ -39,7 +39,8 @@
   }
   const clean = {
     note: d => ({ title: str(d.title, 500), text: str(d.text, 2e6).replace(/!\[[^\]\n]*\]\(([^)\s]*)\)/g, (m, u) => MEDIA_REF.test(u) ? m : ''),
-      updated: num(d.updated) || Date.now(), group: str(d.group, 64) || null }),
+      updated: num(d.updated) || Date.now(), group: str(d.group, 64) || null,
+      fs: Number.isInteger(d.fs) && d.fs >= 10 && d.fs <= 40 ? d.fs : undefined, font: /^[a-z]{1,12}$/.test(d.font) ? d.font : undefined }),
     group: d => ({ name: str(d.name, 80), color: /^#[0-9a-f]{3,8}$/i.test(d.color) ? d.color : '#7cc8ff' }),
     map: d => ({ name: str(d.name, 80), nodes: Array.isArray(d.nodes) ? d.nodes.slice(0, 5000).map(cleanNode).filter(Boolean) : [],
       edges: Array.isArray(d.edges) ? d.edges.slice(0, 20000).filter(e => e && typeof e.from === 'string' && typeof e.to === 'string')

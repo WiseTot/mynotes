@@ -252,6 +252,8 @@ const dropToken = () => { access = ''; accessExp = 0; localStorage.removeItem('g
       if (!note) notes.push(note = { id: n.id });
       Object.assign(note, { title: n.title.slice(0, 500), text: n.text.slice(0, 2e6), updated: Date.now() });
       if ('group' in n) note.group = typeof n.group === 'string' ? n.group.slice(0, 64) : null;
+      if ('fs' in n) note.fs = Number.isInteger(n.fs) && n.fs >= 10 && n.fs <= 40 ? n.fs : undefined; // вид заметки
+      if ('font' in n) note.font = typeof n.font === 'string' && /^[a-z]{1,12}$/.test(n.font) ? n.font : undefined;
       saveNotes();
     },
     'note-group': ({ id, group } = {}) => { const n = notes.find(x => x.id === id); if (n) { n.group = typeof group === 'string' ? group : null; saveNotes(); } },
