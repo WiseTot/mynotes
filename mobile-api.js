@@ -3,7 +3,7 @@
 //  • вход в Google — через официальный модуль Google в браузере (пароль приложение не видит);
 //  • синхронизация — тем же общим ядром synccore.js, что и на ПК.
 (() => {
-  const WEB_CLIENT_ID = ''; // подставляет build-mobile.js
+  const WEB_CLIENT_ID = '112067547236-n2fga01a0lrm5726b9ftrlrhq63104r6.apps.googleusercontent.com'; // подставляет build-mobile.js
   const SCOPE = 'https://www.googleapis.com/auth/drive.appdata';
   const DRIVE = 'https://www.googleapis.com/drive/v3/files', UPLOAD = 'https://www.googleapis.com/upload/drive/v3/files';
   const C = window.SyncCore;
