@@ -43,6 +43,10 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
       <i class="sep"></i>
       <select class="ffont" title="Шрифт" aria-label="Шрифт"></select>
     </div>
+    <div class="m-act glass-pop" role="toolbar" aria-label="Действия с карточкой">
+      <button data-m="link">🔗 Связать</button><button data-m="edit">✎ Изменить</button><button data-m="del">🗑 Удалить</button>
+      <span class="m-act-hint">Нажми на карточку, с которой связать</span><button data-m="cancel">Отмена</button>
+    </div>
   </div>`;
   const q = s => root.querySelector(s);
   const stage = q('.m-stage'), world = q('.m-world'), eg = q('.eg'), tmp = q('.tmp'), cutBtn = q('.e-bar');
@@ -84,7 +88,7 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
   console.assert(fmt(83) === '1:23' && fmt(3723) === '1:02:03', 'fmt');
   console.assert(parseTc('1:23 Битва').t === 83 && parseTc('1:02:03').t === 3723 && parseTc('90 сек тут').label === 'тут' && parseTc('просто текст') === null, 'parseTc');
 
-  let maps = [], m = null, sel = null, editing = null, visible = false, loaded = false, drag = null;
+  let maps = [], m = null, sel = null, editing = null, visible = false, loaded = false, drag = null, linkFrom = null, lastZoom = 0;
   const els = new Map(), players = new Map(); // id карточки → { t, dur, playing, muted, cut }
   const ps = id => players.get(id) || (players.set(id, { t: 0, dur: 0, playing: false, muted: false }), players.get(id));
   let saveT;
@@ -96,10 +100,14 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
     const v = m.view;
     world.style.transform = `translate(${v.x}px, ${v.y}px) scale(${v.zoom})`;
     // при отдалении подписи, кнопки и стрелки растут обратно масштабу — чтобы оставались читаемыми;
-    // текст карточек — мягче (иначе не влезает), а совсем издалека мелочи прячутся — остаётся обзор
-    world.style.setProperty('--k', clamp(Math.pow(1 / v.zoom, .75), 1, 2.4).toFixed(3));
-    world.style.setProperty('--kt', clamp(Math.pow(1 / v.zoom, .55), 1, 2.2).toFixed(3));
-    stage.classList.toggle('far', v.zoom < .45);
+    // текст карточек — мягче (иначе не влезает), а совсем издалека мелочи прячутся — остаётся обзор.
+    // Только когда масштаб изменился: эти переменные пересчитывают стиль всех карточек — при простом сдвиге это зря
+    if (v.zoom !== lastZoom) {
+      lastZoom = v.zoom;
+      world.style.setProperty('--k', clamp(Math.pow(1 / v.zoom, .75), 1, 2.4).toFixed(3));
+      world.style.setProperty('--kt', clamp(Math.pow(1 / v.zoom, .55), 1, 2.2).toFixed(3));
+      stage.classList.toggle('far', v.zoom < .45);
+    }
     stage.style.backgroundSize = `${22 * v.zoom}px ${22 * v.zoom}px`;
     stage.style.backgroundPosition = `${v.x}px ${v.y}px`;
     if (els.size) showFmt(); // панель оформления едет вместе с карточкой
@@ -210,6 +218,7 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
     }
     drawEdges();
     showFmt();
+    showAct();
     emptyEl.textContent = m.nodes.length ? '' : 'Пустая карта. Двойной клик по полю — первая карточка, или кнопки сверху.';
   }
 
@@ -247,6 +256,51 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
     n.font = e.target.value;
     fill(els.get(n.id), n); save();
   });
+
+  // ---------- телефон: панель выбранной карточки (связать / изменить / удалить) — вместо мыши и клавиатуры ----------
+  const actEl = q('.m-act');
+  let delArmed = null, delArmT; // id карточки, удаление которой ждёт второго нажатия
+  function showAct() {
+    const n = sel && node(sel), edge = !n && sel && m.edges.some(e => e.id === sel);
+    actEl.classList.toggle('show', visible && !!(n || edge || linkFrom));
+    actEl.classList.toggle('linking', !!linkFrom);
+    actEl.classList.toggle('edge', !!edge);
+    stage.classList.toggle('linking', !!linkFrom);
+    for (const [id, el] of els) el.classList.toggle('link-from', id === linkFrom);
+    const del = actEl.querySelector('[data-m="del"]');
+    const armed = !!sel && delArmed === sel;
+    del.textContent = armed ? 'Точно удалить?' : edge ? '🗑 Удалить связь' : '🗑 Удалить';
+    del.classList.toggle('armed', armed);
+  }
+  const disarm = () => { delArmed = null; clearTimeout(delArmT); };
+  actEl.addEventListener('pointerdown', e => { e.preventDefault(); e.stopPropagation(); }); // не снимать выделение и не прятать клавиатуру
+  actEl.addEventListener('click', e => {
+    const a = e.target.closest('[data-m]')?.dataset.m, n = sel && node(sel);
+    if (!a) return;
+    if (a !== 'del') disarm();
+    if (a === 'link' && n) linkFrom = n.id;
+    if (a === 'cancel') linkFrom = null;
+    if (a === 'edit' && n) {
+      if (n.type === 'text') startEdit(n);
+      else if (n.type === 'note') { if (getNotes().some(x => x.id === n.noteId)) openNote(n.noteId); }
+      else editTitle(n);
+    }
+    if (a === 'del') {
+      if (delArmed !== sel) { disarm(); delArmed = sel; delArmT = setTimeout(() => { delArmed = null; showAct(); }, 3000); } // удаление в два нажатия
+      else { disarm(); deleteSel(); return; }
+    }
+    showAct();
+  });
+  // режим «Связать»: следующее нажатие на карточку — путь к ней; нажатие на пустое место — отмена
+  function finishLink(targetId) {
+    const from = linkFrom;
+    linkFrom = null;
+    if (targetId && targetId !== from && node(from) && !m.edges.some(x => x.from === from && x.to === targetId)) {
+      m.edges.push({ id: crypto.randomUUID(), from, to: targetId });
+      save();
+    }
+    sync();
+  }
 
   // ---------- плеер: YouTube через postMessage, mp4 — напрямую ----------
   addEventListener('message', e => {
@@ -507,7 +561,11 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
     if (t.dataset && t.dataset.edge) { sel = t.dataset.edge; sync(); showCut(sel); return; }
     const nEl = t.closest('.mn');
     if (!nEl || e.button === 1) {
-      if (editing) document.activeElement.blur();
+      if (editing) { // закончить правку текста, даже если фокус уже ушёл (на телефоне — спрятали клавиатуру)
+        const b = els.get(editing)?.querySelector('.body');
+        if (b && b.onblur) b.onblur();
+        document.activeElement.blur();
+      }
       drag = { kind: 'pan', x: e.clientX, y: e.clientY, moved: false };
       stage.classList.add('panning');
     } else {
@@ -554,7 +612,8 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
     drag = null;
     stage.classList.remove('busy', 'panning');
     tmp.style.display = 'none';
-    if (d.kind === 'pan' && !d.moved) { sel = null; hideCut(true); sync(); }
+    if (linkFrom && !d.moved && d.kind !== 'link') return finishLink(d.n && d.n.id); // режим «Связать»: нажал на карточку или мимо
+    if (d.kind === 'pan' && !d.moved) { sel = null; disarm(); hideCut(true); sync(); }
     if (d.kind === 'link' && d.moved) {
       const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('.mn');
       if (target && target.dataset.id !== d.from.id) {
@@ -677,7 +736,7 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
   }
   function openMap(map) {
     m = map;
-    sel = null;
+    sel = null; linkFrom = null;
     hideCut(true);
     for (const el of els.values()) el.remove();
     els.clear(); players.clear();
@@ -770,6 +829,7 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
       visible = false;
       closePop();
       fmtEl.classList.remove('show');
+      linkFrom = null; actEl.classList.remove('show');
       for (const n of m ? m.nodes : []) if (isMedia(n) && ps(n.id).playing) ctl(n, 'pause'); // ушёл с карты — видео на паузу
     },
   };

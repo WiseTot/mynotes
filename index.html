@@ -369,6 +369,21 @@
   .track:hover { height: 7px; }
   .track i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; background: linear-gradient(90deg, #8a7dff, #4cc3ff); transition: width .25s linear; }
   .m-fmt { position: absolute; z-index: 4; display: none; align-items: center; gap: 3px; padding: 5px; border-radius: 12px; }
+  /* телефон: панель выбранной карточки внизу (на ПК её роль играют мышь и Delete) */
+  .m-act { position: absolute; z-index: 5; left: 50%; bottom: calc(14px + env(safe-area-inset-bottom)); transform: translateX(-50%);
+    display: none; align-items: center; gap: 6px; padding: 6px; border-radius: 14px; max-width: calc(100% - 16px); }
+  @media (pointer: coarse) { .m-act.show { display: flex; } }
+  .m-act button { height: 38px; padding: 0 12px; border: 0; border-radius: 10px; background: rgba(255,255,255,.1); color: #fff; font-size: 14px; white-space: nowrap; cursor: pointer; }
+  .m-act button[data-m="del"].armed { background: rgba(255,90,120,.45); }
+  .m-act .m-act-hint { display: none; padding: 0 6px; font-size: 13px; }
+  .m-act.linking [data-m="link"], .m-act.linking [data-m="edit"], .m-act.linking [data-m="del"],
+  .m-act:not(.linking) [data-m="cancel"], .m-act.edge [data-m="link"], .m-act.edge [data-m="edit"] { display: none; }
+  .m-act.linking .m-act-hint { display: block; }
+  .m-stage.linking .mn { outline: 2px dashed rgba(124,200,255,.55); outline-offset: 3px; }
+  .m-stage.linking .mn.link-from { outline: 3px solid rgba(124,200,255,.95); }
+  /* пока тянешь или двигаешь карту — она отдельный слой видеокарты: кадр не перерисовывается целиком.
+     После отпускания слой убирается, и текст снова чёткий при любом масштабе */
+  .m-stage.busy .m-world { will-change: transform; }
   .m-fmt.show { display: flex; animation: fade .2s var(--ease); }
   .m-fmt button { min-width: 28px; height: 28px; padding: 0 6px; border: 0; border-radius: 8px; background: none; color: #fff; font: inherit; font-size: 13px; cursor: pointer; transition: background .15s; }
   .m-fmt button svg { width: 15px; height: 15px; vertical-align: middle; }
@@ -497,6 +512,10 @@
     .seg button { padding: 0 9px; }
     .spop { left: 8px; right: 8px; width: auto; top: 54px; }
     .m-fmt { flex-wrap: wrap; max-width: calc(100% - 16px); }
+    /* телефону тяжело: размытие под панелями и большие тени пересчитываются на каждом кадре движения */
+    .m-act, .m-fmt { backdrop-filter: none; }
+    .mn { box-shadow: 0 4px 12px rgba(0,0,0,.3); }
+    .mn.sel { box-shadow: 0 0 0 3px rgba(124,200,255,.2); }
   }
 </style>
 </head>
