@@ -296,6 +296,8 @@
     font: inherit; font-size: 13px; padding: 0 10px; cursor: pointer; transition: background .15s; white-space: nowrap; flex: none;
   }
   .m-tools select { max-width: 200px; outline: none; }
+  /* выпадающий список рисует система: без своего фона белый текст на белом не виден */
+  select option { background: #1c1f2b; color: #fff; }
   .m-tools button:hover { background: rgba(255,255,255,.16); }
   .m-tools button.armed { background: rgba(255,80,80,.3); border-color: rgba(255,110,110,.5); }
   .m-tools .sep { width: 1px; height: 20px; background: rgba(255,255,255,.12); margin: 0 4px; }
@@ -470,7 +472,7 @@
   @media (max-width: 760px) {
     .bar { height: 50px; padding-left: 8px; }
     .bar .ttl, .wbtns { display: none; }
-    .tabs { position: static; transform: none; margin: 0; }
+    .tabs { position: relative; left: auto; top: auto; transform: none; margin: 0; } /* relative — подсветка вкладки считается от самих вкладок */
     .tabs button { padding: 0 10px; }
     .sync { gap: 4px; padding-right: 6px; }
     .sbtn { padding: 0 8px; font-size: 0; gap: 4px; }
