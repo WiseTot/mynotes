@@ -531,6 +531,7 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
   };
   stage.addEventListener('pointerdown', e => {
     if (e.pointerType !== 'touch') return;
+    if (e.isPrimary) touches.clear(); // первый палец: всё прежнее — потерянные касания, иначе одно касание сочлось бы щипком
     touches.set(e.pointerId, [e.clientX, e.clientY]);
     if (touches.size !== 2) return;
     const p = pinchOf();
@@ -554,6 +555,17 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
   };
   stage.addEventListener('pointerup', touchEnd, true);
   stage.addEventListener('pointercancel', touchEnd, true);
+  // браузер всё же отобрал касание (системный жест) — закончить перетаскивание как есть, а не оставить «залипшим»
+  stage.addEventListener('pointercancel', () => {
+    if (!drag) return;
+    const d = drag;
+    drag = null;
+    stage.classList.remove('busy', 'panning');
+    tmp.style.display = 'none';
+    if (d.moved) save();
+  });
+  stage.addEventListener('contextmenu', e => { if (!e.target.closest('[contenteditable], input')) e.preventDefault(); });
+  stage.addEventListener('dragstart', e => e.preventDefault());
 
   let lastPointer = 'mouse';
   stage.addEventListener('pointerdown', e => {

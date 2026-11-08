@@ -129,7 +129,11 @@
 
   /* ---------- телефон (узкий экран): список и заметка по очереди, всё под палец ---------- */
   .back { display: none; }
-  .m-stage, .gview canvas { touch-action: none; } /* жесты на карте и графе — наши, а не прокрутка страницы */
+  /* жесты на карте и графе — наши, а не прокрутка страницы. Для всех вложенных тоже: карточка с обрезкой краёв
+     для телефона «прокручиваемая», и без этого Chrome через пару миллиметров забирал палец себе и обрывал перетаскивание */
+  .m-stage, .m-stage *, .gview canvas { touch-action: none; }
+  .m-stage { -webkit-touch-callout: none; } /* долгое нажатие — без системного меню */
+  .m-stage img { -webkit-user-drag: none; }
 
   /* группы заметок */
   .side-top { display: flex; gap: 8px; }
@@ -590,7 +594,13 @@
 <script src="graph.js"></script>
 <script src="map.js"></script>
 <script>
-const api = window.win || { send() {}, on() {}, invoke: async () => null }; // в обычном браузере — заглушка
+const rawApi = window.win || { send() {}, on() {}, invoke: async () => null }; // в обычном браузере — заглушка
+// любое сохранение (заметка, группа, карта, удаление) — сразу пересчитать кнопку «Отправить»
+let changeT;
+const api = { ...rawApi, send(ch, data) {
+  rawApi.send(ch, data);
+  if (/^(note-save|note-group|note-delete|groups-save|maps-save)$/.test(ch)) { clearTimeout(changeT); changeT = setTimeout(() => refreshSync(false), 900); }
+} };
 const $ = id => document.getElementById(id);
 const esc = s => String(s).replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
 const escRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
@@ -806,7 +816,6 @@ const save = later(() => {
   learn(cur.text);
   drawList();
   drawBacklinks();
-  setTimeout(() => refreshSync(false), 300); // появилось что отправлять — показать плашку
 }, 400);
 function edited() {
   if (!cur) return;
