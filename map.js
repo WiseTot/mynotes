@@ -555,8 +555,10 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
   stage.addEventListener('pointerup', touchEnd, true);
   stage.addEventListener('pointercancel', touchEnd, true);
 
+  let lastPointer = 'mouse';
   stage.addEventListener('pointerdown', e => {
     closePop();
+    lastPointer = e.pointerType;
     const t = e.target, at = toWorld(e.clientX, e.clientY);
     if (t.dataset && t.dataset.edge) { sel = t.dataset.edge; sync(); showCut(sel); return; }
     const nEl = t.closest('.mn');
@@ -659,6 +661,8 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
   stage.addEventListener('dblclick', e => {
     const t = realTarget(e), nEl = t.closest('.mn');
     if (!nEl) { startEdit(addNode('text', { text: '' }, toWorld(e.clientX, e.clientY))); return; }
+    // пальцем «нажал, отпустил и сразу потянул» — это двойное касание; на телефоне правка — кнопкой «✎ Изменить», а не так
+    if (lastPointer === 'touch') return;
     const n = node(nEl.dataset.id);
     if (t.closest('.marks, .pbar, .cutbox, button')) return;
     if (n.type === 'text') startEdit(n);

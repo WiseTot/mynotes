@@ -73,8 +73,8 @@
   function copyOf(k, data, newId) {
     const kind = k.split(':')[0];
     if (kind === 'group') return null;
-    const mark = ' (с другого устройства)';
-    return { key: kind + ':' + newId, data: kind === 'note' ? { ...data, title: (data.title || 'Без названия') + mark } : { ...data, name: (data.name || 'Карта') + mark } };
+    const mark = ' (с другого устройства)', tag = s => s.endsWith(mark) ? s : s + mark; // пометка одна, сколько бы раз ни спорили
+    return { key: kind + ':' + newId, data: kind === 'note' ? { ...data, title: tag(data.title || 'Без названия') } : { ...data, name: tag(data.name || 'Карта') } };
   }
 
   // ---------- что изменилось ----------
