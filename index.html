@@ -1,0 +1,1448 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, interactive-widget=resizes-content">
+<meta name="theme-color" content="#0b0d14">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icons/icon-256.png">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline' https://accounts.google.com; script-src 'self' 'unsafe-inline' https://accounts.google.com; img-src 'self' data: blob: https://*.googleusercontent.com; media-src 'self' blob:; connect-src 'self' https://www.googleapis.com https://accounts.google.com https://oauth2.googleapis.com; frame-src https://accounts.google.com https://www.youtube-nocookie.com https://www.youtube.com">
+<title>Заметки</title>
+<style>
+  * { box-sizing: border-box; }
+  :root { --ease: cubic-bezier(.22, 1, .36, 1); --accent: #7cc8ff; --violet: #a99bff; color-scheme: dark; }
+  html, body { margin: 0; height: 100%; }
+  body {
+    display: flex; flex-direction: column; overflow: hidden; color: #fff;
+    font: 14px/1.5 "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+    background:
+      radial-gradient(520px 420px at 0% 0%, rgba(110, 90, 255, .22), transparent 70%),
+      radial-gradient(620px 520px at 100% 100%, rgba(40, 170, 255, .15), transparent 70%),
+      #0c0d14;
+  }
+  .glass-in {
+    background: linear-gradient(135deg, rgba(255,255,255,.08), rgba(255,255,255,.02));
+    border: 1px solid rgba(255,255,255,.1); box-shadow: inset 0 1px 0 rgba(255,255,255,.08);
+  }
+  .glass-pop {
+    background: linear-gradient(135deg, rgba(140, 110, 255, .5), rgba(40, 170, 255, .3)), rgba(16, 18, 30, .92);
+    border: 1px solid rgba(255,255,255,.24);
+    box-shadow: 0 16px 44px rgba(0,0,0,.55), inset 0 1px 0 rgba(255,255,255,.35);
+    backdrop-filter: blur(18px) saturate(160%);
+  }
+  @keyframes fade { from { opacity: 0; transform: translateY(6px); } }
+  button { font: inherit; color: inherit; }
+  ::-webkit-scrollbar { width: 6px; height: 6px; }
+  ::-webkit-scrollbar-thumb { background: rgba(255,255,255,.14); border-radius: 6px; }
+
+  /* ---------- Заголовок окна ---------- */
+  .bar { height: 44px; flex: none; display: flex; align-items: center; padding-left: 16px; -webkit-app-region: drag; user-select: none; position: relative; }
+  .bar .ttl { display: flex; align-items: center; gap: 8px; font-size: 13px; font-weight: 600; opacity: .85; }
+  .bar .ttl svg { width: 16px; height: 16px; color: var(--accent); }
+  .tabs {
+    position: absolute; left: 50%; top: 7px; transform: translateX(-50%); display: flex; padding: 3px; border-radius: 12px;
+    -webkit-app-region: no-drag; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1);
+  }
+  .tabs button {
+    position: relative; z-index: 1; height: 26px; padding: 0 16px; border: 0; border-radius: 9px; background: none; cursor: pointer;
+    font-size: 13px; opacity: .65; transition: opacity .2s;
+  }
+  .tabs button:hover { opacity: .9; }
+  .tabs button.on { opacity: 1; }
+  .tabs .glider {
+    position: absolute; top: 3px; height: 26px; border-radius: 9px; transition: left .35s var(--ease), width .35s var(--ease);
+    background: linear-gradient(135deg, rgba(140,110,255,.55), rgba(40,170,255,.35)); border: 1px solid rgba(255,255,255,.2);
+  }
+  /* синхронизация с телефоном */
+  .sync { margin-left: auto; display: flex; align-items: center; gap: 6px; padding-right: 8px; -webkit-app-region: no-drag; }
+  .sbtn { height: 28px; padding: 0 11px; display: flex; align-items: center; gap: 6px; border-radius: 10px; cursor: pointer; font-size: 12px; font-weight: 600;
+    background: linear-gradient(135deg, rgba(140,110,255,.55), rgba(40,170,255,.35)); border: 1px solid rgba(255,255,255,.25);
+    animation: glowIn .4s var(--ease), pulseGlow 2.4s ease-in-out infinite; transition: filter .15s; }
+  .sbtn.in { background: linear-gradient(135deg, rgba(40,200,170,.5), rgba(40,170,255,.35)); }
+  .sbtn:hover { filter: brightness(1.2); }
+  .sbtn[disabled] { opacity: .5; animation: none; cursor: default; }
+  .sbtn svg { width: 15px; height: 15px; }
+  .sbtn b { padding: 0 6px; border-radius: 7px; background: rgba(0,0,0,.25); }
+  .sbtn[hidden] { display: none; }
+  @keyframes glowIn { from { opacity: 0; transform: translateY(-4px); } }
+  @keyframes pulseGlow { 50% { box-shadow: 0 0 14px rgba(124,200,255,.45); } }
+  .sstat { font-size: 12px; opacity: .45; white-space: nowrap; cursor: pointer; }
+  .sstat.warn { opacity: 1; color: #ffd36b; }
+  .scfg { width: 30px; height: 28px; padding: 0; border: 0; border-radius: 9px; background: none; cursor: pointer; opacity: .6; display: grid; place-items: center; }
+  .scfg:hover { opacity: 1; background: rgba(255,255,255,.1); }
+  .scfg svg { width: 17px; height: 17px; }
+  .spop { position: fixed; right: 150px; top: 46px; z-index: 25; width: 340px; padding: 16px; border-radius: 16px; display: none; font-size: 13px; }
+  .spop.show { display: block; animation: fade .25s var(--ease); }
+  .spop h4 { margin: 0 0 8px; font-size: 15px; }
+  .spop h5 { margin: 14px 0 6px; font-size: 13px; }
+  .spop p, .spop .hint { margin: 0 0 10px; opacity: .75; line-height: 1.45; }
+  .spop .hint { font-size: 12px; opacity: .6; }
+  .spop .ok { color: #7dffb5; font-weight: 600; margin-bottom: 6px; }
+  .spop hr { border: 0; border-top: 1px solid rgba(255,255,255,.15); margin: 12px 0; }
+  .spop input { width: 100%; margin-bottom: 8px; padding: 8px 11px; border-radius: 10px; border: 1px solid rgba(255,255,255,.2); outline: none;
+    background: rgba(0,0,0,.25); color: #fff; font: inherit; }
+  .spop input:focus { border-color: rgba(140,160,255,.8); }
+  .spop .btns { display: flex; gap: 8px; flex-wrap: wrap; }
+  .spop button { padding: 7px 13px; border-radius: 10px; border: 1px solid rgba(255,255,255,.2); background: rgba(255,255,255,.1); color: #fff; font: inherit; cursor: pointer; }
+  .spop button:hover { background: rgba(255,255,255,.2); }
+  .spop button.primary { background: rgba(120,140,255,.6); border-color: rgba(160,175,255,.6); font-weight: 600; }
+  .spop button.armed { background: rgba(255,80,80,.45); }
+  .spop .msg { min-height: 16px; margin-top: 8px; font-size: 12px; color: #ffd36b; }
+  .toast { position: fixed; left: 50%; bottom: 22px; z-index: 30; max-width: 70vw; padding: 10px 16px; border-radius: 13px; font-size: 13px;
+    transform: translate(-50%, 12px); opacity: 0; pointer-events: none; transition: opacity .25s, transform .35s var(--ease); }
+  .toast.show { opacity: 1; transform: translate(-50%, 0); }
+  .wbtns { display: flex; height: 100%; -webkit-app-region: no-drag; }
+  .wbtns button { width: 46px; height: 100%; border: 0; background: none; opacity: .7; cursor: pointer; transition: background .15s, opacity .15s; }
+  .wbtns button svg { width: 11px; height: 11px; }
+  .wbtns button:hover { background: rgba(255,255,255,.08); opacity: 1; }
+  .wbtns .wclose:hover { background: #e81123; }
+
+  .views { flex: 1; min-height: 0; position: relative; }
+  .view { position: absolute; inset: 0; display: none; }
+  .view.on { display: flex; animation: fade .35s var(--ease); }
+
+  /* ---------- Заметки ---------- */
+  .app { flex: 1; min-height: 0; display: flex; gap: 12px; padding: 0 12px 12px; }
+  aside { width: 260px; flex: none; min-height: 0; display: flex; flex-direction: column; gap: 10px; padding: 12px; border-radius: 18px; }
+  .new {
+    height: 38px; border-radius: 12px; cursor: pointer; font-weight: 600; display: flex; align-items: center; justify-content: center; gap: 8px;
+    background: rgba(120,140,255,.45); border: 1px solid rgba(160,175,255,.5); transition: background .2s, transform .1s;
+  }
+  .new:hover { background: rgba(120,140,255,.6); }
+  .new:active { transform: scale(.98); }
+  .new svg { width: 16px; height: 16px; }
+  input.search, .field {
+    width: 100%; font: inherit; color: #fff; padding: 8px 12px; border-radius: 12px; outline: none;
+    background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.1); transition: border-color .2s;
+  }
+  input.search:focus, .field:focus { border-color: rgba(140,160,255,.7); }
+  input::placeholder { color: rgba(255,255,255,.3); }
+  .list { flex: 1; overflow-y: auto; margin: 0 -6px; padding: 0 6px; display: flex; flex-direction: column; gap: 3px; }
+  .item { padding: 9px 12px; border-radius: 12px; cursor: pointer; border: 1px solid transparent; transition: background .15s, border-color .15s; }
+  .item:hover { background: rgba(255,255,255,.06); }
+  .item.sel { background: rgba(120,140,255,.22); border-color: rgba(160,175,255,.35); }
+  .item b { display: block; font-weight: 600; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item .pv { font-size: 12px; opacity: .5; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .item .dt { font-size: 11px; opacity: .38; }
+  .nothing { font-size: 13px; opacity: .45; padding: 8px 4px; }
+
+  /* ---------- телефон (узкий экран): список и заметка по очереди, всё под палец ---------- */
+  .back { display: none; }
+  .m-stage, .gview canvas { touch-action: none; } /* жесты на карте и графе — наши, а не прокрутка страницы */
+
+  /* группы заметок */
+  .side-top { display: flex; gap: 8px; }
+  .side-top .new { flex: 1; }
+  .newg { width: 38px; height: 38px; flex: none; display: grid; place-items: center; border-radius: 12px; cursor: pointer;
+    background: rgba(255,255,255,.07); border: 1px solid rgba(255,255,255,.14); transition: background .2s; }
+  .newg:hover { background: rgba(255,255,255,.16); }
+  .newg svg { width: 18px; height: 18px; }
+  .ghead { display: flex; align-items: center; gap: 7px; margin-top: 6px; padding: 6px 8px; border-radius: 10px; cursor: pointer; user-select: none;
+    font-size: 12px; font-weight: 600; letter-spacing: .02em; color: rgba(255,255,255,.8); transition: background .15s; }
+  .ghead:hover { background: rgba(255,255,255,.05); }
+  .ghead.drop { background: rgba(124,200,255,.18); outline: 1px dashed rgba(124,200,255,.7); }
+  .ghead .chev { width: 10px; height: 10px; flex: none; opacity: .6; transition: transform .25s var(--ease); }
+  .ghead.shut .chev { transform: rotate(-90deg); }
+  .ghead .dot { width: 10px; height: 10px; flex: none; border-radius: 50%; background: var(--gc); box-shadow: 0 0 10px var(--gc); cursor: pointer; transition: transform .2s; }
+  .ghead .dot:hover { transform: scale(1.35); }
+  .ghead.loose .dot { background: rgba(255,255,255,.25); box-shadow: none; cursor: default; }
+  .ghead .gname { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+  .ghead .gname[contenteditable] { background: rgba(0,0,0,.35); border-radius: 5px; padding: 0 4px; outline: none; cursor: text; text-overflow: clip; }
+  .ghead .cnt { font-weight: 400; opacity: .45; }
+  .ghead .ga { display: none; gap: 1px; }
+  .ghead:hover .ga { display: flex; }
+  .ghead:hover .cnt { display: none; }
+  .ga button { width: 22px; height: 22px; padding: 0; border: 0; border-radius: 6px; background: none; color: #fff; font-size: 12px; opacity: .7; cursor: pointer; }
+  .ga button:hover { opacity: 1; background: rgba(255,255,255,.15); }
+  .ga button.armed { opacity: 1; background: rgba(255,80,80,.45); }
+  .gitems { display: flex; flex-direction: column; gap: 3px; margin: 2px 0 2px 12px; padding-left: 8px; border-left: 2px solid color-mix(in srgb, var(--gc) 50%, transparent); animation: fade .25s var(--ease); }
+  .gitems.drop { background: rgba(124,200,255,.08); border-radius: 0 10px 10px 0; }
+  .item.dragging { opacity: .35; }
+  .hchip { height: 32px; padding: 0 10px; display: flex; align-items: center; gap: 6px; flex: none; border-radius: 10px; cursor: pointer; font-size: 12px; max-width: 200px;
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis; background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.12); transition: background .2s; }
+  .hchip:hover { background: rgba(255,255,255,.14); }
+  .hchip svg { width: 15px; height: 15px; flex: none; }
+  .hchip i { width: 9px; height: 9px; flex: none; border-radius: 50%; background: var(--gc); box-shadow: 0 0 8px var(--gc); }
+  .gmenu { position: fixed; z-index: 12; min-width: 210px; max-height: 320px; overflow-y: auto; padding: 6px; border-radius: 13px; display: none; }
+  .gmenu.show { display: block; animation: fade .2s var(--ease); }
+  .gmenu div { display: flex; align-items: center; gap: 8px; padding: 7px 10px; border-radius: 9px; cursor: pointer; font-size: 13px; }
+  .gmenu div:hover { background: rgba(255,255,255,.18); }
+  .gmenu div.on { background: rgba(255,255,255,.26); }
+  .gmenu i { width: 9px; height: 9px; flex: none; border-radius: 50%; background: var(--gc); }
+
+  .editor { flex: 1; min-width: 0; min-height: 0; display: flex; flex-direction: column; border-radius: 18px; }
+  .ehead { display: flex; align-items: center; gap: 10px; padding: 18px 22px 2px; }
+  #title {
+    flex: 1; min-width: 0; padding: 0; border: 0; outline: none; background: none; color: #fff;
+    font: 600 24px/1.3 "Segoe UI Variable Display", "Segoe UI", sans-serif;
+  }
+  #title::placeholder { color: rgba(255,255,255,.22); }
+  .del {
+    height: 32px; padding: 0 10px; border-radius: 10px; cursor: pointer; display: flex; align-items: center; gap: 6px; font-size: 13px;
+    background: none; border: 1px solid transparent; opacity: .55; transition: opacity .2s, background .2s, border-color .2s;
+  }
+  .del svg { width: 16px; height: 16px; }
+  .del span { display: none; }
+  .del:hover { opacity: 1; background: rgba(255,255,255,.07); }
+  .del.armed { opacity: 1; background: rgba(255,80,80,.25); border-color: rgba(255,110,110,.5); }
+  .del.armed span { display: inline; }
+  .meta { padding: 0 22px 8px; font-size: 12px; opacity: .38; }
+  .meta kbd { font: inherit; padding: 0 4px; border-radius: 4px; background: rgba(255,255,255,.1); }
+  #text {
+    flex: 1; overflow-y: auto; padding: 6px 22px 24px; outline: none; white-space: pre-wrap; overflow-wrap: anywhere;
+    font-size: 15px; line-height: 1.75; caret-color: var(--accent);
+  }
+  #text:empty::before { content: "Начни писать… Ссылка на другую заметку — [[Название]]"; color: rgba(255,255,255,.22); pointer-events: none; }
+  /* картинки в тексте заметки */
+  #text img.nimg {
+    display: block; max-width: min(100%, 720px); max-height: 480px; margin: 8px 0; border-radius: 12px; cursor: zoom-in;
+    border: 1px solid rgba(255,255,255,.12); box-shadow: 0 8px 24px rgba(0,0,0,.35); animation: fade .35s var(--ease);
+  }
+  #text img.nimg:hover { border-color: rgba(124,200,255,.6); }
+  .lightbox { position: fixed; inset: 0; z-index: 20; display: grid; place-items: center; background: rgba(5,6,12,.82); backdrop-filter: blur(8px);
+    opacity: 0; pointer-events: none; transition: opacity .25s; cursor: zoom-out; }
+  .lightbox.show { opacity: 1; pointer-events: auto; }
+  .lightbox img { max-width: 92vw; max-height: 88vh; border-radius: 14px; box-shadow: 0 20px 60px rgba(0,0,0,.6); transform: scale(.94); transition: transform .35s var(--ease); }
+  .lightbox.show img { transform: none; }
+  /* разметка без обёрток в тексте — через CSS Highlight API */
+  ::highlight(spell) { text-decoration: underline wavy #ff6b8a; text-decoration-thickness: 1.5px; text-underline-offset: 4px; background-color: rgba(255, 90, 120, .1); }
+  ::highlight(wl) { color: #9fd6ff; background-color: rgba(124, 200, 255, .12); text-decoration: underline; text-decoration-color: rgba(124, 200, 255, .5); text-underline-offset: 4px; }
+  ::highlight(wlnew) { color: #c6b8ff; background-color: rgba(169, 155, 255, .1); text-decoration: underline dashed; text-decoration-color: rgba(169, 155, 255, .55); text-underline-offset: 4px; }
+  ::highlight(hd) { color: #d9cfff; text-shadow: 0 0 18px rgba(169, 155, 255, .55); }
+  ::highlight(flash) { background-color: rgba(255, 211, 107, .35); }
+
+  /* обратные ссылки */
+  .links { flex: none; border-top: 1px solid rgba(255,255,255,.08); margin: 0 12px; }
+  .links-head { display: flex; align-items: center; gap: 8px; padding: 9px 10px; font-size: 12px; opacity: .6; cursor: pointer; user-select: none; }
+  .links-head:hover { opacity: .9; }
+  .links-head b { padding: 0 7px; border-radius: 8px; background: rgba(124,200,255,.2); color: var(--accent); font-weight: 600; }
+  .links-head svg { width: 12px; height: 12px; margin-left: auto; transition: transform .3s var(--ease); }
+  .links.shut .links-head svg { transform: rotate(-90deg); }
+  .links-list { max-height: 170px; overflow-y: auto; padding: 0 4px 10px; display: flex; flex-direction: column; gap: 6px; transition: max-height .35s var(--ease); }
+  .links.shut .links-list { max-height: 0; padding-bottom: 0; overflow: hidden; }
+  .bl { padding: 8px 10px; border-radius: 10px; cursor: pointer; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.06); transition: background .15s; }
+  .bl:hover { background: rgba(255,255,255,.09); }
+  .bl b { display: block; font-size: 13px; }
+  .bl span { display: block; font-size: 12px; opacity: .6; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .bl mark { background: none; color: var(--accent); }
+  .empty-links { font-size: 12px; opacity: .35; padding: 0 10px 10px; }
+
+  /* ---------- Всплывашки: варианты исправления, превью ссылки, автодополнение, кнопка цитаты ---------- */
+  .sugg, .peek, .ac {
+    position: fixed; z-index: 10; border-radius: 15px;
+    opacity: 0; transform: translateY(8px) scale(.94); pointer-events: none;
+    transition: opacity .18s ease, transform .3s var(--ease);
+  }
+  .sugg.below, .peek.below, .ac { transform: translateY(-8px) scale(.96); }
+  .sugg.show, .peek.show, .ac.show { opacity: 1; transform: none; pointer-events: auto; }
+  .sugg { max-width: 380px; padding: 8px; }
+  .opts { display: flex; flex-wrap: wrap; gap: 6px; }
+  .opt {
+    position: relative; padding: 5px 12px; border-radius: 10px; cursor: pointer; font-size: 14px;
+    background: rgba(255,255,255,.13); border: 1px solid rgba(255,255,255,.2); transition: background .15s, transform .1s;
+    opacity: 0; animation: pop .3s var(--ease) forwards;
+  }
+  .opt:nth-child(2) { animation-delay: .03s; } .opt:nth-child(3) { animation-delay: .06s; }
+  .opt:nth-child(4) { animation-delay: .09s; } .opt:nth-child(5) { animation-delay: .12s; }
+  @keyframes pop { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+  .opt:first-child { background: rgba(255,255,255,.28); font-weight: 600; }
+  .opt:hover { background: rgba(255,255,255,.36); }
+  .opt:active { transform: scale(.95); }
+  .opt i { position: absolute; top: 4px; right: 4px; width: 5px; height: 5px; border-radius: 50%; background: #ffd36b; }
+  .none { padding: 3px 6px; font-size: 13px; opacity: .8; }
+  .foot { display: flex; gap: 4px; margin-top: 8px; padding-top: 7px; border-top: 1px solid rgba(255,255,255,.16); }
+  .foot button { padding: 3px 8px; border: 0; border-radius: 8px; background: none; cursor: pointer; font-size: 12px; opacity: .8; transition: background .15s, opacity .15s; }
+  .foot button:hover { opacity: 1; background: rgba(255,255,255,.14); }
+
+  .peek { width: 340px; max-height: 260px; padding: 12px 14px; cursor: pointer; overflow: hidden; }
+  .peek h4 { margin: 0 0 6px; font-size: 14px; display: flex; gap: 6px; align-items: center; }
+  .peek h4 small { font-weight: 400; opacity: .65; }
+  .peek pre { margin: 0; font: inherit; font-size: 13px; line-height: 1.55; white-space: pre-wrap; overflow-wrap: anywhere; opacity: .9; max-height: 170px; overflow: hidden;
+    -webkit-mask-image: linear-gradient(#000 75%, transparent); }
+  .peek pre mark { background: rgba(255, 211, 107, .35); color: #fff; border-radius: 3px; }
+  .peek .hint { margin-top: 8px; font-size: 11px; opacity: .6; }
+
+  .ac { min-width: 240px; max-width: 360px; padding: 6px; }
+  .ac div { padding: 6px 10px; border-radius: 9px; cursor: pointer; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .ac div small { opacity: .55; margin-left: 6px; }
+  .ac div.on { background: rgba(255,255,255,.22); }
+  .ac .mk { color: #ffd36b; }
+
+  .quote {
+    position: fixed; z-index: 9; padding: 5px 11px; border-radius: 10px; font-size: 12px; cursor: pointer;
+    opacity: 0; transform: translateY(4px); pointer-events: none; transition: opacity .15s, transform .25s var(--ease);
+  }
+  .quote.show { opacity: 1; transform: none; pointer-events: auto; }
+
+  /* ---------- Граф ---------- */
+  .gview { position: relative; flex: 1; overflow: hidden; }
+  .gview canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: grab; }
+  .gview canvas:active { cursor: grabbing; }
+  .g-tools { position: absolute; left: 50%; top: 10px; transform: translateX(-50%); z-index: 2; display: flex; gap: 10px; align-items: center; }
+  .seg { display: flex; padding: 3px; border-radius: 12px; background: rgba(20,22,34,.7); border: 1px solid rgba(255,255,255,.12); }
+  .seg button { height: 28px; padding: 0 14px; border: 0; border-radius: 9px; background: none; cursor: pointer; font-size: 13px; opacity: .65; transition: background .2s, opacity .2s; }
+  .seg button:hover { opacity: 1; }
+  .seg button.on { opacity: 1; background: linear-gradient(135deg, rgba(140,110,255,.55), rgba(40,170,255,.35)); }
+  .g-hint { position: absolute; left: 16px; bottom: 12px; font-size: 12px; opacity: .4; pointer-events: none; }
+  .g-tip { position: absolute; z-index: 3; padding: 5px 10px; border-radius: 9px; font-size: 13px; pointer-events: none; opacity: 0; transition: opacity .15s; white-space: nowrap; }
+  .g-tip.show { opacity: 1; }
+
+  /* ---------- Карты ---------- */
+  .mview { position: relative; flex: 1; overflow: hidden; display: flex; flex-direction: column; }
+  .m-tools { position: absolute; left: 12px; right: 12px; top: 0; z-index: 3; display: flex; align-items: center; gap: 6px; padding: 6px; border-radius: 14px; }
+  .m-tools select, .m-tools button {
+    height: 30px; border-radius: 9px; border: 1px solid rgba(255,255,255,.12); background: rgba(255,255,255,.07); color: #fff;
+    font: inherit; font-size: 13px; padding: 0 10px; cursor: pointer; transition: background .15s; white-space: nowrap; flex: none;
+  }
+  .m-tools select { max-width: 200px; outline: none; }
+  .m-tools button:hover { background: rgba(255,255,255,.16); }
+  .m-tools button.armed { background: rgba(255,80,80,.3); border-color: rgba(255,110,110,.5); }
+  .m-tools .sep { width: 1px; height: 20px; background: rgba(255,255,255,.12); margin: 0 4px; }
+  .m-tools .hint { margin-left: auto; font-size: 12px; opacity: .4; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; min-width: 0; }
+  .m-stage {
+    position: absolute; inset: 0; overflow: hidden; cursor: default;
+    background-image: radial-gradient(rgba(255,255,255,.09) 1px, transparent 1.4px);
+  }
+  .m-stage.panning { cursor: grabbing; }
+  .m-stage { user-select: none; } /* иначе при перетаскивании и растягивании текст заливается синим выделением */
+  .m-stage [contenteditable], .m-stage input { user-select: text; }
+  /* чистый вид на паузе: тёмные плашки закрывают название и «Другие видео» YouTube */
+  .mn.clean .pov.paused {
+    background: linear-gradient(#000 0, rgba(0,0,0,.92) 58px, transparent 110px),
+                linear-gradient(to top, #000 0, rgba(0,0,0,.92) 40px, transparent 90px);
+  }
+  .mn.clean .pov.paused::after {
+    content: ""; position: absolute; left: 50%; top: 50%; width: 54px; height: 54px; margin: -27px 0 0 -27px; border-radius: 50%;
+    background: rgba(12,13,20,.6) url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24'%3E%3Cpath d='M9 6v12l10-6z' fill='white'/%3E%3C/svg%3E") center/26px no-repeat;
+    border: 1px solid rgba(255,255,255,.25); backdrop-filter: blur(6px);
+  }
+  .m-world { position: absolute; left: 0; top: 0; transform-origin: 0 0; }
+  .m-edges { position: absolute; left: 0; top: 0; width: 1px; height: 1px; overflow: visible; pointer-events: none; }
+  .m-edges path.e { fill: none; stroke: rgba(150,165,255,.75); stroke-width: 2; stroke-opacity: .88; }
+  .m-edges path.hit { fill: none; stroke: transparent; stroke-width: 14; pointer-events: stroke; cursor: pointer; }
+  .m-edges path.e.sel { stroke-dasharray: 8 6; animation: march .8s linear infinite; } /* выбранная ветка «бежит» своим цветом */
+  .m-edges path.tmp { fill: none; stroke: rgba(124,200,255,.9); stroke-width: 2; stroke-dasharray: 6 5; animation: march .6s linear infinite; }
+  @keyframes march { to { stroke-dashoffset: -14; } }
+  .mn {
+    position: absolute; border-radius: 14px; display: flex; flex-direction: column; overflow: visible;
+    background: linear-gradient(135deg, rgba(255,255,255,.11), rgba(255,255,255,.04)), rgba(20,22,34,.92);
+    border: 1px solid rgba(255,255,255,.16); box-shadow: 0 10px 30px rgba(0,0,0,.35), inset 0 1px 0 rgba(255,255,255,.12);
+    animation: nodeIn .35s var(--ease);
+  }
+  @keyframes nodeIn { from { opacity: 0; transform: scale(.9); } }
+  .mn.sel { border-color: rgba(124,200,255,.8); box-shadow: 0 0 0 3px rgba(124,200,255,.2), 0 10px 30px rgba(0,0,0,.35); }
+  .mn .clip { flex: 1; min-height: 0; overflow: hidden; border-radius: 13px; display: flex; flex-direction: column; }
+  .mn .head { flex: none; height: 28px; display: flex; align-items: center; gap: 6px; padding: 0 10px; font-size: 12px; font-weight: 600; cursor: move;
+    background: rgba(255,255,255,.06); border-bottom: 1px solid rgba(255,255,255,.08); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .mn .head svg { width: 13px; height: 13px; flex: none; color: var(--accent); }
+  .mn .body { flex: 1; min-height: 0; padding: 10px 12px; font-size: 14px; line-height: 1.5; white-space: pre-wrap; overflow-wrap: anywhere; overflow: auto; cursor: move; outline: none; }
+  .mn .body[contenteditable] { cursor: text; background: rgba(0,0,0,.15); }
+  .mn .body:empty::before { content: "Двойной клик — написать"; opacity: .35; }
+  .mn.note .body { font-size: 13px; opacity: .85; }
+  .mn img { flex: 1; min-height: 0; width: 100%; object-fit: cover; display: block; cursor: move; -webkit-user-drag: none; }
+  .m-stage.busy iframe, .m-stage.busy video { pointer-events: none; } /* пока тащим — видео не перехватывает мышь */
+  /* видео-карточки */
+  .mn .head .ttl { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; }
+  .mn .head .ttl[contenteditable] { cursor: text; background: rgba(0,0,0,.3); border-radius: 5px; padding: 0 4px; text-overflow: clip; outline: none; }
+  .hb { flex: none; height: 20px; min-width: 22px; padding: 0 6px; border: 0; border-radius: 6px; background: rgba(255,255,255,.08); color: #fff; font-size: 11px; cursor: pointer; transition: background .15s; }
+  .hb:hover { background: rgba(255,255,255,.2); }
+  .hb.armed { background: rgba(255,211,107,.4); }
+  .mn.clean .hb.eye { background: rgba(124,200,255,.4); }
+  .mn .player { position: relative; flex: 1; min-height: 0; display: flex; background: #000; }
+  .mn .player iframe, .mn .player video { flex: 1; width: 100%; height: 100%; border: 0; display: block; object-fit: contain; background: #000; }
+  .pov { position: absolute; inset: 0 0 36px 0; display: none; cursor: pointer; } /* поверх видео: мышь не будит интерфейс YouTube */
+  .mn.clean .pov { display: block; }
+  .pbar {
+    position: absolute; left: 8px; right: 8px; bottom: 6px; height: 28px; display: none; align-items: center; gap: 8px; padding: 0 8px;
+    border-radius: 9px; background: rgba(12,13,20,.78); border: 1px solid rgba(255,255,255,.14); backdrop-filter: blur(8px);
+    opacity: 0; transition: opacity .25s;
+  }
+  .mn.clean .pbar { display: flex; }
+  .mn.clean:hover .pbar, .pbar.paused { opacity: 1; }
+  .pbar button { flex: none; width: 22px; padding: 0; border: 0; background: none; color: #fff; cursor: pointer; font-size: 12px; opacity: .85; }
+  .pbar button:hover { opacity: 1; }
+  .pbar .tm { flex: none; font-size: 11px; opacity: .8; font-variant-numeric: tabular-nums; white-space: nowrap; }
+  .track { position: relative; flex: 1; height: 4px; border-radius: 4px; background: rgba(255,255,255,.18); cursor: pointer; transition: height .15s; }
+  .track:hover { height: 7px; }
+  .track i { position: absolute; left: 0; top: 0; bottom: 0; border-radius: 4px; background: linear-gradient(90deg, #8a7dff, #4cc3ff); transition: width .25s linear; }
+  .m-fmt { position: absolute; z-index: 4; display: none; align-items: center; gap: 3px; padding: 5px; border-radius: 12px; }
+  .m-fmt.show { display: flex; animation: fade .2s var(--ease); }
+  .m-fmt button { min-width: 28px; height: 28px; padding: 0 6px; border: 0; border-radius: 8px; background: none; color: #fff; font: inherit; font-size: 13px; cursor: pointer; transition: background .15s; }
+  .m-fmt button svg { width: 15px; height: 15px; vertical-align: middle; }
+  .m-fmt button:hover { background: rgba(255,255,255,.18); }
+  .m-fmt button.on { background: rgba(255,255,255,.3); }
+  .m-fmt .fsz { min-width: 22px; text-align: center; font-size: 12px; opacity: .85; font-variant-numeric: tabular-nums; }
+  .m-fmt .sep { width: 1px; height: 18px; background: rgba(255,255,255,.2); margin: 0 3px; }
+  .m-fmt select { height: 28px; border-radius: 8px; border: 1px solid rgba(255,255,255,.2); background: rgba(0,0,0,.25); color: #fff; font: inherit; font-size: 12px; padding: 0 6px; outline: none; cursor: pointer; }
+  .cutbox { display: none; flex: none; align-items: center; gap: 5px; flex-wrap: wrap; padding: 6px 8px; font-size: 12px;
+    border-top: 1px solid rgba(255,211,107,.25); background: rgba(255,211,107,.07); animation: fade .25s var(--ease); }
+  .mn.cutting .cutbox { display: flex; }
+  .cutbox .cl { color: #ffd36b; }
+  .cutbox input { width: 72px; padding: 3px 7px; border-radius: 7px; border: 1px solid rgba(255,255,255,.18); outline: none;
+    background: rgba(255,255,255,.08); color: #fff; font: inherit; font-size: 12px; font-variant-numeric: tabular-nums; }
+  .cutbox input:focus { border-color: rgba(255,211,107,.7); }
+  .cutbox button { padding: 3px 7px; border-radius: 7px; border: 1px solid rgba(255,255,255,.14); background: rgba(255,255,255,.08); color: #fff; font: inherit; font-size: 12px; cursor: pointer; }
+  .cutbox button:hover { background: rgba(255,255,255,.2); }
+  .cutbox .go { background: rgba(255,211,107,.28); border-color: rgba(255,211,107,.5); }
+  .cutbox .go:hover { background: rgba(255,211,107,.45); }
+  .cutbox .cx { margin-left: auto; border: 0; background: none; opacity: .6; }
+  .cutbox .dash { opacity: .5; }
+  .cutbox .cerr { flex-basis: 100%; color: #ffb3c0; font-size: 11px; }
+  .cutbox .cerr:empty { display: none; }
+  .marks { flex: none; display: flex; align-items: center; gap: 5px; padding: 5px 8px; overflow-x: auto; border-top: 1px solid rgba(255,255,255,.08); }
+  .marks::-webkit-scrollbar { height: 3px; }
+  .chips { display: flex; gap: 5px; }
+  .mk { flex: none; display: flex; align-items: center; gap: 4px; padding: 2px 8px; border-radius: 8px; font-size: 11.5px; white-space: nowrap; cursor: pointer;
+    background: rgba(124,200,255,.14); border: 1px solid rgba(124,200,255,.3); transition: background .15s; }
+  .mk:hover { background: rgba(124,200,255,.28); }
+  .mk b { color: var(--accent); font-weight: 600; }
+  .mk .x { font-style: normal; opacity: 0; transition: opacity .15s; }
+  .mk:hover .x { opacity: .7; }
+  .mk .x:hover { opacity: 1; color: #ff8a9a; }
+  .addm { flex: none; padding: 2px 8px; border: 1px dashed rgba(255,255,255,.28); border-radius: 8px; background: none; color: #fff; font-size: 11.5px; cursor: pointer; opacity: .7; }
+  .addm:hover { opacity: 1; }
+  .marks input { flex: 1; min-width: 180px; padding: 2px 8px; border: 1px solid rgba(124,200,255,.55); border-radius: 8px; outline: none; background: rgba(255,255,255,.08); color: #fff; font: inherit; font-size: 12px; }
+  /* посередине ветки: палитра цвета и ✕ — разорвать */
+  .e-bar {
+    position: absolute; z-index: 3; display: none; align-items: center; gap: 4px; padding: 4px 5px; border-radius: 12px;
+    transform: scale(var(--k)) translate(-50%, -50%); transform-origin: 0 0; /* центр — точно на середине ветки при любом масштабе */
+    background: rgba(16,18,30,.94); border: 1px solid rgba(255,255,255,.2); box-shadow: 0 6px 18px rgba(0,0,0,.5);
+  }
+  .e-bar.show { display: flex; animation: barIn .2s ease; }
+  @keyframes barIn { from { opacity: 0; } }
+  .e-cols { display: flex; gap: 4px; }
+  .e-cols i { width: 16px; height: 16px; border-radius: 50%; background: var(--c); cursor: pointer; border: 2px solid transparent; transition: transform .15s; }
+  .e-cols i:hover { transform: scale(1.2); }
+  .e-cols i.on { border-color: #fff; }
+  .e-bar .e-cut { width: 22px; height: 22px; margin-left: 2px; padding: 0; border: 0; border-radius: 50%; cursor: pointer;
+    background: rgba(255,80,100,.9); color: #fff; font-size: 11px; transition: transform .15s; }
+  .e-bar .e-cut:hover { transform: scale(1.15); }
+  .mh {
+    position: absolute; width: 12px; height: 12px; margin: -6px 0 0 -6px; border-radius: 50%; cursor: crosshair; z-index: 2;
+    background: #7cc8ff; border: 2px solid #0c0d14; opacity: 0; transform: scale(.6); transition: opacity .15s, transform .2s var(--ease);
+  }
+  .mn:hover .mh, .mn.sel .mh { opacity: .9; transform: none; }
+  .mh:hover { transform: scale(1.4) !important; opacity: 1; }
+  .mh[data-side=t] { left: 50%; top: 0; } .mh[data-side=b] { left: 50%; top: 100%; }
+  .mh[data-side=l] { left: 0; top: 50%; } .mh[data-side=r] { left: 100%; top: 50%; }
+  .mr { position: absolute; right: -4px; bottom: -4px; width: 14px; height: 14px; cursor: nwse-resize; z-index: 2; opacity: 0; transition: opacity .15s;
+    background: linear-gradient(135deg, transparent 50%, rgba(124,200,255,.9) 50%); border-radius: 0 0 6px 0; }
+  .mn:hover .mr, .mn.sel .mr { opacity: 1; }
+  /* «Умное отдаление»: --k = 1 / масштаб (от 1 до 3, ставит map.js). При отдалении подписи, кнопки,
+     тайм-коды, панель плеера, точки и стрелки растут обратно — и остаются читаемыми. При масштабе ≥ 100% всё как обычно. */
+  .m-world { --k: 1; --kt: 1; }
+  /* совсем издалека — обзор: только названия, текст, превью и стрелки */
+  .m-stage.far .pbar, .m-stage.far .marks, .m-stage.far .cutbox, .m-stage.far .hb,
+  .m-stage.far .mh, .m-stage.far .mr { display: none !important; }
+  .m-stage.far .pov { inset: 0; }
+  .m-edges path.e, .m-edges path.tmp { stroke-width: calc(2px * var(--k)); }
+  .m-edges path.hit { stroke-width: calc(14px * var(--k)); }
+  .mn .head { height: calc(28px * var(--k)); font-size: calc(12px * var(--k)); padding: 0 calc(10px * var(--k)); gap: calc(6px * var(--k)); }
+  .mn .head svg { width: calc(13px * var(--k)); height: calc(13px * var(--k)); }
+  .mn .body { padding: calc(10px * var(--k)) calc(12px * var(--k)); }
+  .mn.note .body { font-size: calc(13px * var(--kt)); }
+  .mn .body:empty::before { font-size: calc(13px * var(--kt)); }
+  .hb { height: calc(20px * var(--k)); min-width: calc(22px * var(--k)); padding: 0 calc(6px * var(--k)); font-size: calc(11px * var(--k)); border-radius: calc(6px * var(--k)); }
+  .pov { inset: 0 0 calc(36px * var(--k)) 0; }
+  .pbar { height: calc(28px * var(--k)); left: calc(8px * var(--k)); right: calc(8px * var(--k)); bottom: calc(6px * var(--k)); gap: calc(8px * var(--k)); padding: 0 calc(8px * var(--k)); border-radius: calc(9px * var(--k)); }
+  .pbar button { width: calc(22px * var(--k)); font-size: calc(12px * var(--k)); }
+  .pbar .tm { font-size: calc(11px * var(--k)); }
+  .track { height: calc(4px * var(--k)); }
+  .track:hover { height: calc(7px * var(--k)); }
+  .marks { padding: calc(5px * var(--k)) calc(8px * var(--k)); gap: calc(5px * var(--k)); }
+  .chips { gap: calc(5px * var(--k)); }
+  .mk, .addm { font-size: calc(11.5px * var(--k)); padding: calc(2px * var(--k)) calc(8px * var(--k)); border-radius: calc(8px * var(--k)); }
+  .marks input { font-size: calc(12px * var(--k)); min-width: calc(180px * var(--k)); }
+  .cutbox { font-size: calc(12px * var(--k)); gap: calc(5px * var(--k)); padding: calc(6px * var(--k)) calc(8px * var(--k)); }
+  .cutbox input { width: calc(72px * var(--k)); font-size: calc(12px * var(--k)); }
+  .cutbox button { font-size: calc(12px * var(--k)); padding: calc(3px * var(--k)) calc(7px * var(--k)); }
+  .mh { width: calc(12px * var(--k)); height: calc(12px * var(--k)); margin: calc(-6px * var(--k)) 0 0 calc(-6px * var(--k)); }
+  .mr { width: calc(14px * var(--k)); height: calc(14px * var(--k)); }
+  .m-pop { position: absolute; z-index: 5; width: 320px; padding: 10px; border-radius: 14px; display: none; }
+  .m-pop.show { display: block; animation: fade .25s var(--ease); }
+  .m-pop .pick { max-height: 260px; overflow-y: auto; margin-top: 8px; display: flex; flex-direction: column; gap: 2px; }
+  .m-pop .pick div { padding: 6px 10px; border-radius: 9px; cursor: pointer; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+  .m-pop .pick div:hover { background: rgba(255,255,255,.16); }
+  .m-pop .err { font-size: 12px; color: #ffb3c0; margin-top: 6px; min-height: 16px; }
+  .m-empty { position: absolute; inset: 0; display: grid; place-items: center; text-align: center; opacity: .5; font-size: 14px; pointer-events: none; }
+  /* телефон: в конце, чтобы перекрывать обычные правила */
+  @media (max-width: 760px) {
+    .bar { height: 50px; padding-left: 8px; }
+    .bar .ttl, .wbtns { display: none; }
+    .tabs { position: static; transform: none; margin: 0; }
+    .tabs button { padding: 0 10px; }
+    .sync { gap: 4px; padding-right: 6px; }
+    .sbtn { padding: 0 8px; font-size: 0; gap: 4px; }
+    .sbtn b { font-size: 12px; }
+    .sstat { font-size: 11px; }
+    .app { padding: 0 8px 8px; }
+    aside { width: 100%; }
+    .editor { display: none; }
+    html.editing aside { display: none; }
+    html.editing .editor { display: flex; }
+    .back { display: grid; place-items: center; width: 36px; height: 36px; flex: none; border: 0; border-radius: 11px; background: rgba(255,255,255,.08); color: #fff; cursor: pointer; }
+    .back svg { width: 18px; height: 18px; }
+    .ehead { flex-wrap: wrap; gap: 8px; padding: 12px 12px 2px; }
+    #title { flex-basis: calc(100% - 100px); font-size: 20px; }
+    .meta { padding: 0 12px 6px; font-size: 0; }
+    #meta { font-size: 12px; }
+    #text { padding: 6px 12px 24px; font-size: 16px; }
+    .links-list { max-height: 120px; }
+    .item { padding: 11px 12px; }
+    .m-tools { flex-wrap: nowrap; overflow-x: auto; }
+    .m-tools .hint, .g-hint { display: none; }
+    .seg button { padding: 0 9px; }
+    .spop { left: 8px; right: 8px; width: auto; top: 54px; }
+    .m-fmt { flex-wrap: wrap; max-width: calc(100% - 16px); }
+  }
+</style>
+</head>
+<body>
+<div class="bar">
+  <div class="ttl"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 3h9l4 4v14H6z"/><path d="M9 11h7M9 15h7M9 7h3"/></svg>Заметки</div>
+  <div class="tabs" id="tabs">
+    <i class="glider" id="glider"></i>
+    <button data-view="notes" class="on">Заметки</button>
+    <button data-view="graph">Граф</button>
+    <button data-view="map">Карты</button>
+  </div>
+  <div class="sync" id="sync">
+    <button class="sbtn" id="syncOut" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4.5 4.5 0 0 1-.5-9 6 6 0 0 1 11.5 1.5A3.75 3.75 0 0 1 17.5 18"/><path d="M12 20v-8M9 15l3-3 3 3"/></svg>Отправить <b></b></button>
+    <button class="sbtn in" id="syncIn" hidden><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4.5 4.5 0 0 1-.5-9 6 6 0 0 1 11.5 1.5A3.75 3.75 0 0 1 17.5 18"/><path d="M12 12v8M9 17l3 3 3-3"/></svg>Загрузить <b></b></button>
+    <span class="sstat" id="syncStat"></span>
+    <button class="scfg" id="syncCfg" title="Синхронизация с телефоном"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M7 18a4.5 4.5 0 0 1-.5-9 6 6 0 0 1 11.5 1.5A3.75 3.75 0 0 1 17.5 18z"/></svg></button>
+  </div>
+  <div class="wbtns">
+    <button id="wMin" title="Свернуть" aria-label="Свернуть"><svg viewBox="0 0 10 10"><path d="M0 5h10" stroke="currentColor"/></svg></button>
+    <button id="wMax" title="Развернуть" aria-label="Развернуть"><svg viewBox="0 0 10 10"><rect x=".5" y=".5" width="9" height="9" fill="none" stroke="currentColor"/></svg></button>
+    <button id="wClose" class="wclose" title="Закрыть" aria-label="Закрыть"><svg viewBox="0 0 10 10"><path d="M0 0l10 10M10 0 0 10" stroke="currentColor"/></svg></button>
+  </div>
+</div>
+
+<div class="views">
+  <div class="view on" id="v-notes">
+    <div class="app">
+      <aside class="glass-in">
+        <div class="side-top">
+          <button class="new" id="new" title="Ctrl+N"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round"><path d="M12 5v14M5 12h14"/></svg>Новая заметка</button>
+          <button class="newg" id="newGroup" title="Новая группа" aria-label="Новая группа"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M3 7a2 2 0 0 1 2-2h4l2 2h8a2 2 0 0 1 2 2v8a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2z"/><path d="M12 10.5v5M9.5 13h5"/></svg></button>
+        </div>
+        <input class="search" id="search" placeholder="Поиск (Ctrl+F)" aria-label="Поиск по заметкам">
+        <div class="list" id="list"></div>
+      </aside>
+      <div class="editor glass-in">
+        <div class="ehead">
+          <button class="back" id="back" title="К списку" aria-label="К списку заметок"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 5l-7 7 7 7"/></svg></button>
+          <input id="title" placeholder="Название" aria-label="Название заметки" spellcheck="false">
+          <button class="hchip" id="groupBtn" title="Группа заметки"></button>
+          <button class="hchip" id="toMap" title="Положить заметку на карту"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linejoin="round"><path d="M3 6l6-2 6 2 6-2v14l-6 2-6-2-6 2z"/><path d="M9 4v14M15 6v14"/></svg>На карту</button>
+          <button class="del" id="del" title="Удалить заметку"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round"><path d="M4 7h16M10 11v6M14 11v6M6 7l1 13h10l1-13M9 7V4h6v3"/></svg><span>Точно удалить?</span></button>
+        </div>
+        <div class="meta"><span id="meta"></span> · <kbd>[[</kbd> ссылка · <kbd>Ctrl</kbd>+клик — перейти</div>
+        <div id="text" contenteditable="true" spellcheck="false" role="textbox" aria-multiline="true" aria-label="Текст заметки"></div>
+        <div class="links" id="links">
+          <div class="links-head" id="linksHead">Ссылаются сюда <b id="blCount">0</b>
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M6 9l6 6 6-6"/></svg></div>
+          <div class="links-list" id="blList"></div>
+        </div>
+      </div>
+    </div>
+  </div>
+  <div class="view" id="v-graph"></div>
+  <div class="view" id="v-map"></div>
+</div>
+
+<div class="sugg glass-pop" id="sugg" role="dialog" aria-label="Варианты исправления"></div>
+<div class="peek glass-pop" id="peek" role="tooltip"></div>
+<div class="ac glass-pop" id="ac" role="listbox" aria-label="Заметки для ссылки"></div>
+<button class="quote glass-pop" id="quoteBtn">🔗 Ссылка на цитату</button>
+<div class="lightbox" id="lightbox"><img alt=""></div>
+<div class="gmenu glass-pop" id="gmenu" role="menu" aria-label="Выбрать группу"></div>
+<div class="toast glass-pop" id="toast" role="status"></div>
+<div class="spop glass-pop" id="syncPop" role="dialog" aria-label="Синхронизация с телефоном"></div>
+
+<script src="synccore.js"></script>
+<script src="mobile-api.js"></script>
+<script src="spellcore.js"></script>
+<script src="graph.js"></script>
+<script src="map.js"></script>
+<script>
+const api = window.win || { send() {}, on() {}, invoke: async () => null }; // в обычном браузере — заглушка
+const $ = id => document.getElementById(id);
+const esc = s => String(s).replace(/[&<>"']/g, c => `&#${c.charCodeAt(0)};`);
+const escRe = s => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+const textEl = $('text'), titleEl = $('title');
+const later = (fn, ms) => { let t; const run = () => { clearTimeout(t); t = null; fn(); }; const f = () => { clearTimeout(t); t = setTimeout(run, ms); }; f.flush = () => t && run(); return f; };
+
+$('wMin').onclick = () => api.send('win-min');
+$('wMax').onclick = () => api.send('win-max');
+$('wClose').onclick = () => { save.flush(); api.send('win-close'); };
+
+// ================= Вкладки: Заметки / Граф / Карты =================
+let view = 'notes';
+function showView(name) {
+  view = name;
+  document.querySelectorAll('.tabs button').forEach(b => b.classList.toggle('on', b.dataset.view === name));
+  document.querySelectorAll('.view').forEach(v => v.classList.toggle('on', v.id === 'v-' + name));
+  const b = document.querySelector(`.tabs button[data-view="${name}"]`);
+  Object.assign($('glider').style, { left: b.offsetLeft + 'px', width: b.offsetWidth + 'px' });
+  hidePop(true); hidePeek(true); closeAc(); $('quoteBtn').classList.remove('show');
+  name === 'graph' ? graph.show() : graph.hide();
+  name === 'map' ? map.show() : map.hide();
+}
+$('tabs').addEventListener('click', e => { const b = e.target.closest('button[data-view]'); if (b) { save.flush(); showView(b.dataset.view); } });
+
+// ================= Заметки =================
+let notes = [], cur = null;
+const sorted = () => [...notes].sort((a, b) => b.updated - a.updated);
+const fmtDate = ts => {
+  const d = new Date(ts), now = new Date();
+  if (d.toDateString() === now.toDateString()) return 'сегодня, ' + d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+  return d.toLocaleDateString('ru-RU', d.getFullYear() === now.getFullYear() ? { day: 'numeric', month: 'short' } : undefined);
+};
+const isEmpty = n => !n.title.trim() && !n.text.trim();
+// картинка в тексте заметки хранится как ![](file:///…/media/xxx.png), а в редакторе показывается картинкой
+const IMGTOK = /!\[[^\]\n]*\]\(([^)\s]+)\)/g;
+const plain = t => t.replace(IMGTOK, '🖼'); // для списка, превью и обратных ссылок
+// имя заметки для ссылок: название, а если его нет — первая строка
+const nameOf = n => n.title.trim() || plain(n.text).split('\n').map(l => l.trim()).find(Boolean) || 'Без названия';
+const byName = name => notes.find(n => nameOf(n).toLowerCase() === name.trim().toLowerCase());
+
+// ================= Группы заметок =================
+let groups = []; // [{ id, name, color, open }]
+const GCOL = ['#7cc8ff', '#a99bff', '#5fe0b0', '#ffd36b', '#ff8a6b', '#ff6b9a', '#c6f06b', '#e6e8f0'];
+const saveGroups = () => api.send('groups-save', groups);
+const groupOf = n => n && groups.find(g => g.id === n.group) || null;
+const CHEV = '<svg class="chev" viewBox="0 0 10 10"><path d="M2 3.5l3 3 3-3" stroke="currentColor" stroke-width="1.6" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg>';
+
+function itemHTML(n) {
+  const lines = plain(n.text).split('\n').map(l => l.trim()).filter(Boolean);
+  const title = n.title.trim() || lines.shift() || 'Без названия';
+  return `<div class="item ${cur && n.id === cur.id ? 'sel' : ''}" data-id="${esc(n.id)}" draggable="true" title="Перетащи в группу">
+    <b>${esc(title)}</b><div class="pv">${esc(lines[0] || ' ')}</div><div class="dt">${fmtDate(n.updated)}</div></div>`;
+}
+function drawList() {
+  const q = $('search').value.trim().toLowerCase();
+  const match = n => !q || (n.title + '\n' + n.text).toLowerCase().includes(q);
+  const all = sorted().filter(match);
+  if (!groups.length) {
+    $('list').innerHTML = all.map(itemHTML).join('') || `<div class="nothing">${q ? 'Ничего не найдено' : 'Заметок пока нет'}</div>`;
+    return;
+  }
+  let html = '';
+  for (const g of groups) {
+    const items = all.filter(n => n.group === g.id);
+    if (q && !items.length) continue;
+    const open = g.open || !!q; // при поиске группы с находками раскрыты
+    html += `<div class="ghead ${open ? '' : 'shut'}" data-g="${esc(g.id)}" style="--gc:${esc(g.color)}">${CHEV}
+      <i class="dot" data-gact="color" title="Сменить цвет"></i><span class="gname">${esc(g.name)}</span><span class="cnt">${items.length}</span>
+      <span class="ga"><button data-gact="add" title="Новая заметка в этой группе">＋</button><button data-gact="map" title="Все заметки группы — на карту">🗺</button>
+      <button data-gact="rename" title="Переименовать">✎</button><button data-gact="del" title="Удалить группу (заметки останутся)">🗑</button></span></div>`;
+    if (open) html += `<div class="gitems" data-g="${esc(g.id)}" style="--gc:${esc(g.color)}">${items.map(itemHTML).join('') || '<div class="nothing">Перетащи сюда заметки</div>'}</div>`;
+  }
+  const loose = all.filter(n => !groupOf(n));
+  if (loose.length || !q) html += `<div class="ghead loose" data-g=""><span style="width:10px"></span><i class="dot"></i><span class="gname">Без группы</span><span class="cnt">${loose.length}</span></div>
+    <div class="gitems" data-g="" style="--gc:rgba(255,255,255,.3)">${loose.map(itemHTML).join('')}</div>`;
+  $('list').innerHTML = html || '<div class="nothing">Ничего не найдено</div>';
+}
+function setGroup(id, gid) {
+  const n = notes.find(x => x.id === id);
+  if (!n || (n.group || '') === (gid || '')) return;
+  n.group = gid || null;
+  api.send('note-group', { id, group: n.group });
+  drawList(); drawGroupChip();
+}
+function newGroup(thenAssign) {
+  const g = { id: crypto.randomUUID(), name: 'Новая группа', color: GCOL[groups.length % GCOL.length], open: true };
+  groups.push(g); saveGroups();
+  if (thenAssign && cur) setGroup(cur.id, g.id);
+  drawList();
+  renameGroup(g);
+}
+function renameGroup(g) {
+  const name = $('list').querySelector(`.ghead[data-g="${CSS.escape(g.id)}"] .gname`);
+  if (!name) return;
+  name.contentEditable = 'plaintext-only';
+  name.focus();
+  getSelection().selectAllChildren(name);
+  name.onkeydown = e => { if (e.key === 'Enter' || e.key === 'Escape') { e.preventDefault(); name.blur(); } };
+  name.onblur = () => { g.name = name.textContent.trim().slice(0, 80) || g.name; saveGroups(); drawList(); drawGroupChip(); };
+}
+let armedGroup = null, armedT;
+$('list').addEventListener('click', e => {
+  const head = e.target.closest('.ghead'), act = e.target.closest('[data-gact]')?.dataset.gact;
+  if (head && !head.classList.contains('loose')) {
+    const g = groups.find(x => x.id === head.dataset.g);
+    if (!g || e.target.closest('.gname[contenteditable]')) return;
+    if (act === 'color') { g.color = GCOL[(GCOL.indexOf(g.color) + 1) % GCOL.length]; saveGroups(); drawList(); drawGroupChip(); return; }
+    if (act === 'add') { g.open = true; saveGroups(); const n = createNote('', g.id); select(n.id); document.documentElement.classList.add('editing'); titleEl.focus(); return; }
+    if (act === 'map') return sendToMap(notes.filter(n => n.group === g.id && !isEmpty(n)).map(n => n.id));
+    if (act === 'rename') return renameGroup(g);
+    if (act === 'del') { // удаление в два нажатия; заметки не удаляются — переходят в «Без группы»
+      if (armedGroup !== g.id) { armedGroup = g.id; e.target.closest('button').classList.add('armed'); e.target.closest('button').title = 'Нажми ещё раз — удалить группу'; clearTimeout(armedT); armedT = setTimeout(() => { armedGroup = null; drawList(); }, 3000); return; }
+      armedGroup = null;
+      groups = groups.filter(x => x !== g);
+      notes.filter(n => n.group === g.id).forEach(n => { n.group = null; api.send('note-group', { id: n.id, group: null }); });
+      saveGroups(); drawList(); drawGroupChip();
+      return;
+    }
+    g.open = !g.open; saveGroups(); drawList(); // клик по заголовку — свернуть/развернуть
+    return;
+  }
+  const it = e.target.closest('.item[data-id]');
+  if (it) { select(it.dataset.id); document.documentElement.classList.add('editing'); } // на телефоне — открыть заметку на весь экран
+});
+// перетаскивание заметки в группу (или в «Без группы»)
+$('list').addEventListener('dragstart', e => {
+  const it = e.target.closest('.item[data-id]');
+  if (!it) return;
+  e.dataTransfer.setData('application/x-note', it.dataset.id);
+  e.dataTransfer.effectAllowed = 'move';
+  it.classList.add('dragging');
+});
+$('list').addEventListener('dragend', () => $('list').querySelectorAll('.dragging, .drop').forEach(x => x.classList.remove('dragging', 'drop')));
+const dropZone = e => e.dataTransfer.types.includes('application/x-note') && e.target.closest('.ghead, .gitems');
+$('list').addEventListener('dragover', e => {
+  const z = dropZone(e);
+  $('list').querySelectorAll('.drop').forEach(x => x !== z && x.classList.remove('drop'));
+  if (!z) return;
+  e.preventDefault();
+  z.classList.add('drop');
+});
+$('list').addEventListener('drop', e => {
+  const z = dropZone(e);
+  if (!z) return;
+  e.preventDefault();
+  setGroup(e.dataTransfer.getData('application/x-note'), z.dataset.g);
+});
+$('newGroup').onclick = () => newGroup(false);
+
+// группа текущей заметки — кнопка в шапке и меню выбора
+function drawGroupChip() {
+  const g = groupOf(cur);
+  $('groupBtn').style.setProperty('--gc', g ? g.color : 'rgba(255,255,255,.3)');
+  $('groupBtn').innerHTML = `<i></i>${g ? esc(g.name) : 'Без группы'} ▾`;
+}
+$('groupBtn').onclick = () => {
+  const menu = $('gmenu'), r = $('groupBtn').getBoundingClientRect(), g = groupOf(cur);
+  menu.innerHTML = groups.map(x => `<div data-pick="${esc(x.id)}" class="${g === x ? 'on' : ''}" style="--gc:${esc(x.color)}"><i></i>${esc(x.name)}</div>`).join('')
+    + `<div data-pick="" class="${g ? '' : 'on'}" style="--gc:rgba(255,255,255,.3)"><i></i>Без группы</div><div data-pick="+">＋ Новая группа</div>`;
+  menu.style.left = Math.min(r.left, innerWidth - 230) + 'px';
+  menu.style.top = r.bottom + 6 + 'px';
+  menu.classList.add('show');
+};
+$('gmenu').addEventListener('click', e => {
+  const d = e.target.closest('[data-pick]');
+  if (!d || !cur) return;
+  $('gmenu').classList.remove('show');
+  d.dataset.pick === '+' ? newGroup(true) : setGroup(cur.id, d.dataset.pick);
+});
+document.addEventListener('pointerdown', e => { if (!e.target.closest('#gmenu, #groupBtn')) $('gmenu').classList.remove('show'); });
+
+// заметки — на карту (кнопка в шапке и 🗺 у группы)
+async function sendToMap(ids) {
+  if (!ids.length) return;
+  save.flush();
+  showView('map');
+  await map.show();
+  map.addNotes(ids);
+}
+$('toMap').onclick = () => { if (cur && !isEmpty(cur)) sendToMap([cur.id]); };
+
+function select(id) {
+  save.flush();
+  commitRename();
+  // пустую заметку, с которой ушли, не храним
+  if (cur && cur.id !== id && isEmpty(cur)) { notes = notes.filter(n => n !== cur); api.send('note-delete', cur.id); }
+  cur = notes.find(n => n.id === id) || null;
+  disarm();
+  hidePop(true); hidePeek(true); closeAc();
+  titleEl.value = cur ? cur.title : '';
+  renderText(cur ? cur.text : '');
+  textEl.scrollTop = 0;
+  $('meta').textContent = cur ? 'Изменено: ' + fmtDate(cur.updated) : '';
+  snapshot = countWords(cur ? cur.text : '');
+  drawList();
+  drawGroupChip();
+  drawBacklinks();
+  paint();
+  spellSoon();
+}
+function createNote(title = '', group = null) {
+  const n = { id: crypto.randomUUID(), title, text: '', updated: Date.now(), group };
+  notes.push(n);
+  if (title) api.send('note-save', { id: n.id, title, text: '', group });
+  return n;
+}
+function newNote() { select(createNote().id); document.documentElement.classList.add('editing'); titleEl.focus(); }
+function openNote(id) { if (view !== 'notes') showView('notes'); select(id); document.documentElement.classList.add('editing'); }
+
+const save = later(() => {
+  if (!cur) return;
+  api.send('note-save', { id: cur.id, title: cur.title, text: cur.text, group: cur.group || null });
+  learn(cur.text);
+  drawList();
+  drawBacklinks();
+  setTimeout(() => refreshSync(false), 300); // появилось что отправлять — показать плашку
+}, 400);
+function edited() {
+  if (!cur) return;
+  cur.title = titleEl.value;
+  cur.text = readText();
+  cur.updated = Date.now();
+  $('meta').textContent = 'Изменено: ' + fmtDate(cur.updated);
+  save();
+}
+titleEl.addEventListener('input', edited);
+titleEl.addEventListener('keydown', e => { if (e.key === 'Enter') { e.preventDefault(); textEl.focus(); } });
+textEl.addEventListener('input', () => { edited(); hidePop(true); hidePeek(true); paintSoon(); spellSoon(); autocomplete(); });
+
+$('search').addEventListener('input', drawList);
+$('new').onclick = newNote;
+
+// удаление в два нажатия: первое — «Точно удалить?», второе — удаляет
+let armTimer;
+function disarm() { clearTimeout(armTimer); $('del').classList.remove('armed'); }
+$('del').onclick = () => {
+  if (!cur) return;
+  if (!$('del').classList.contains('armed')) {
+    $('del').classList.add('armed');
+    armTimer = setTimeout(disarm, 3000);
+    return;
+  }
+  disarm();
+  const id = cur.id;
+  notes = notes.filter(n => n.id !== id);
+  api.send('note-delete', id);
+  cur = null;
+  notes.length ? select(sorted()[0].id) : newNote();
+};
+
+document.addEventListener('keydown', e => {
+  if (view !== 'notes') return;
+  if (e.ctrlKey && e.code === 'KeyN') { e.preventDefault(); newNote(); }
+  if (e.ctrlKey && e.code === 'KeyF') { e.preventDefault(); $('search').focus(); $('search').select(); }
+  if (e.key === 'Escape') { hidePop(true); hidePeek(true); closeAc(); }
+});
+addEventListener('beforeunload', () => save.flush());
+
+// ================= Текст редактора: картинки, вставка, перетаскивание =================
+function imgEl(src) {
+  const img = document.createElement('img');
+  // dataset.src — как картинка записана в заметке; src — откуда её показать (на телефоне — из памяти браузера)
+  img.className = 'nimg'; img.dataset.src = src; img.src = api.mediaSrc ? api.mediaSrc(src) : src;
+  img.alt = ''; img.contentEditable = 'false'; img.draggable = false;
+  return img;
+}
+function renderText(text) {
+  textEl.textContent = '';
+  let last = 0;
+  for (const m of text.matchAll(IMGTOK)) { textEl.append(text.slice(last, m.index), imgEl(m[1])); last = m.index + m[0].length; }
+  textEl.append(text.slice(last));
+}
+function readText() { // DOM редактора → текст заметки
+  const ser = n => n.nodeType === 3 ? n.data
+    : n.nodeName === 'BR' ? '\n'
+    : n.nodeName === 'IMG' ? `![](${n.dataset.src || n.getAttribute('src')})`
+    : (/^(DIV|P)$/.test(n.nodeName) ? '\n' : '') + [...n.childNodes].map(ser).join('');
+  return [...textEl.childNodes].map(ser).join('').replace(/\n$/, '');
+}
+function insertImage(src, range) {
+  range.deleteContents();
+  const img = imgEl(src), after = document.createTextNode('\n');
+  const frag = document.createDocumentFragment();
+  frag.append('\n', img, after);
+  range.insertNode(frag);
+  const sel = getSelection(), c = new Range();
+  c.setStart(after, 1);
+  sel.removeAllRanges(); sel.addRange(c);
+  edited();
+}
+const extOf = f => '.' + (f.type.split('/')[1] || 'png').replace('jpeg', 'jpg').replace(/\+.*/, '');
+// Ctrl+V: картинка из буфера (скриншот, «копировать изображение») — в заметку; текст — только как текст, без чужого оформления
+textEl.addEventListener('paste', async e => {
+  e.preventDefault();
+  const files = [...e.clipboardData.files].filter(f => f.type.startsWith('image/'));
+  if (!files.length) return document.execCommand('insertText', false, e.clipboardData.getData('text/plain'));
+  const range = getSelection().getRangeAt(0).cloneRange();
+  for (const f of files) {
+    const url = await api.invoke('media-paste', { bytes: new Uint8Array(await f.arrayBuffer()), ext: extOf(f) });
+    if (url) insertImage(url, range);
+  }
+});
+textEl.addEventListener('drop', async e => {
+  e.preventDefault();
+  const range = document.caretRangeFromPoint(e.clientX, e.clientY);
+  if (!range) return;
+  const paths = [...e.dataTransfer.files].map(f => api.pathForFile ? api.pathForFile(f) : '').filter(Boolean);
+  if (paths.length) {
+    for (const m of await api.invoke('media-import', paths) || []) if (m.kind === 'image') insertImage(m.url, range);
+    return;
+  }
+  const text = e.dataTransfer.getData('text/plain');
+  if (text) { const sel = getSelection(); sel.removeAllRanges(); sel.addRange(range); document.execCommand('insertText', false, text); }
+});
+textEl.addEventListener('keydown', e => {
+  if (e.defaultPrevented) return; // автодополнение уже забрало клавишу
+  if (e.key === 'Enter') { e.preventDefault(); document.execCommand('insertLineBreak'); }
+  if (e.ctrlKey && /^Key[BIU]$/.test(e.code)) e.preventDefault(); // без жирного/курсива из браузера — текст остаётся простым
+});
+textEl.addEventListener('click', e => {
+  if (e.target.classList?.contains('nimg')) { $('lightbox').querySelector('img').src = e.target.src; $('lightbox').classList.add('show'); }
+});
+$('lightbox').onclick = () => $('lightbox').classList.remove('show');
+$('back').onclick = () => { save.flush(); document.documentElement.classList.remove('editing'); drawList(); }; // телефон: назад к списку
+
+// ================= Текст редактора: узлы, поиск, диапазоны =================
+function textNodes() {
+  const out = [], tw = document.createTreeWalker(textEl, NodeFilter.SHOW_TEXT);
+  while (tw.nextNode()) out.push(tw.currentNode);
+  return out;
+}
+function nodeRange(node, start, end) { const r = new Range(); r.setStart(node, start); r.setEnd(node, end); return r; }
+// первое совпадение регулярки в тексте редактора (по строкам/узлам)
+function findInText(re) {
+  for (const n of textNodes()) { re.lastIndex = 0; const m = re.exec(n.data); if (m) return { node: n, index: m.index, length: m[0].length }; }
+  return null;
+}
+
+// ================= Связи между заметками =================
+// [[Заметка]]  [[Заметка#Раздел или цитата]]  [[Заметка|подпись]]  [[#Раздел этой заметки]]
+const LINK = /\[\[([^\[\]\n]+?)\]\]/g;
+const parseLink = inner => {
+  const [target, alias] = inner.split('|');
+  const i = target.indexOf('#');
+  return { title: (i < 0 ? target : target.slice(0, i)).trim(), frag: i < 0 ? '' : target.slice(i + 1).trim(), alias: (alias || '').trim() };
+};
+const linksOf = n => [...n.text.matchAll(LINK)].map(m => parseLink(m[1]));
+const targetOf = l => l.title ? byName(l.title) : cur;
+console.assert(JSON.stringify(parseLink('Идеи#Сюжет|см.')) === '{"title":"Идеи","frag":"Сюжет","alias":"см."}', 'parseLink');
+
+// раздел (# Заголовок) или кусок текста (цитата) внутри заметки
+function locate(text, frag) {
+  if (!frag) return null;
+  const h = new RegExp('^#{1,6}\\s*' + escRe(frag) + '\\s*$', 'im').exec(text);
+  if (h) return { index: h.index, length: h[0].length, heading: true };
+  const i = text.toLowerCase().indexOf(frag.toLowerCase());
+  return i < 0 ? null : { index: i, length: frag.length, heading: false };
+}
+function excerpt(n, frag) { // текст для превью: раздел целиком, строки вокруг цитаты или начало заметки
+  const text = plain(n.text), loc = locate(text, frag);
+  if (!loc) return { body: esc(text.slice(0, 600)), missing: !!frag };
+  if (loc.heading) {
+    const level = /^#+/.exec(text.slice(loc.index))[0].length;
+    const rest = text.slice(loc.index);
+    const next = rest.slice(1).search(new RegExp(`\\n#{1,${level}}\\s`));
+    return { body: esc(next < 0 ? rest.slice(0, 700) : rest.slice(0, next + 1)) };
+  }
+  const from = Math.max(0, text.lastIndexOf('\n', Math.max(0, loc.index - 120)));
+  const to = text.indexOf('\n', loc.index + loc.length + 160);
+  const part = text.slice(from, to < 0 ? undefined : to).replace(/^\n/, '');
+  const at = part.toLowerCase().indexOf(frag.toLowerCase());
+  return { body: esc(part.slice(0, at)) + '<mark>' + esc(part.slice(at, at + frag.length)) + '</mark>' + esc(part.slice(at + frag.length)) };
+}
+
+function openLink(l) {
+  let t = targetOf(l);
+  if (!t) t = createNote(l.title); // как в Obsidian: ссылка на несуществующую заметку создаёт её
+  openNote(t.id);
+  if (l.frag) jumpTo(l.frag);
+}
+function jumpTo(frag) {
+  const hit = findInText(new RegExp('^#{1,6}\\s*' + escRe(frag) + '\\s*$', 'im')) || findInText(new RegExp(escRe(frag), 'i'));
+  if (!hit) return;
+  const r = nodeRange(hit.node, hit.index, hit.index + hit.length);
+  const rect = r.getBoundingClientRect(), box = textEl.getBoundingClientRect();
+  textEl.scrollTop += rect.top - box.top - box.height / 3;
+  textEl.focus();
+  const sel = getSelection(); sel.removeAllRanges(); sel.addRange(nodeRange(hit.node, hit.index, hit.index));
+  if (window.CSS?.highlights) {
+    CSS.highlights.set('flash', new Highlight(r));
+    setTimeout(() => CSS.highlights.delete('flash'), 1800);
+  }
+}
+
+// подсветка: ссылки, заголовки, ошибки
+const linkSpans = data => [...data.matchAll(LINK)].map(m => [m.index, m.index + m[0].length, parseLink(m[1])]);
+const inSpans = (spans, i) => spans.some(([s, e]) => i >= s && i < e);
+function paint() {
+  if (!window.CSS?.highlights) return;
+  const sel = getSelection(), caretNode = sel.isCollapsed ? sel.anchorNode : null, caretOff = sel.anchorOffset;
+  const spell = [], wl = [], wlnew = [], hd = [];
+  for (const n of textNodes()) {
+    const spans = linkSpans(n.data);
+    for (const [s, e, l] of spans) (targetOf(l) ? wl : wlnew).push(nodeRange(n, s, e));
+    for (const m of n.data.matchAll(/^#{1,6}\s.*$/gm)) hd.push(nodeRange(n, m.index, m.index + m[0].length));
+    for (const m of n.data.matchAll(WORD)) {
+      if (!isBad(m[0]) || inSpans(spans, m.index)) continue;
+      const end = m.index + m[0].length;
+      if (n === caretNode && caretOff === end && document.activeElement === textEl) continue; // слово ещё печатается
+      spell.push(nodeRange(n, m.index, end));
+    }
+  }
+  CSS.highlights.set('spell', new Highlight(...spell));
+  CSS.highlights.set('wl', new Highlight(...wl));
+  CSS.highlights.set('wlnew', new Highlight(...wlnew));
+  CSS.highlights.set('hd', new Highlight(...hd));
+}
+const paintSoon = later(paint, 120);
+
+// что под курсором: ссылка или слово
+function linkAt(x, y) {
+  const r = document.caretRangeFromPoint(x, y);
+  if (!r || r.startContainer.nodeType !== 3 || !textEl.contains(r.startContainer)) return null;
+  const node = r.startContainer;
+  for (const [s, e, l] of linkSpans(node.data)) {
+    if (r.startOffset < s || r.startOffset > e) continue;
+    const hit = [...nodeRange(node, s, e).getClientRects()].find(c => x >= c.left - 1 && x <= c.right + 1 && y >= c.top - 2 && y <= c.bottom + 2);
+    if (hit) return { link: l, rect: hit, node, start: s };
+  }
+  return null;
+}
+function wordAt(x, y) {
+  const r = document.caretRangeFromPoint(x, y);
+  if (!r || r.startContainer.nodeType !== 3 || !textEl.contains(r.startContainer)) return null;
+  const node = r.startContainer, off = r.startOffset;
+  for (const m of node.data.matchAll(WORD)) {
+    if (m.index > off) break;
+    if (off > m.index + m[0].length) continue;
+    // caretRangeFromPoint находит ближайшее место и в пустоте — проверяем, что курсор правда над словом
+    const hit = [...nodeRange(node, m.index, m.index + m[0].length).getClientRects()].find(c => x >= c.left - 1 && x <= c.right + 1 && y >= c.top - 2 && y <= c.bottom + 2);
+    return hit ? { node, start: m.index, word: m[0], rect: hit } : null;
+  }
+  return null;
+}
+// Ctrl+клик по ссылке — перейти
+textEl.addEventListener('mousedown', e => {
+  if (!e.ctrlKey) return;
+  const h = linkAt(e.clientX, e.clientY);
+  if (h) { e.preventDefault(); hidePeek(true); openLink(h.link); }
+});
+// на телефоне нет Ctrl и наведения: тап по ссылке — превью, тап по превью — перейти
+textEl.addEventListener('click', e => {
+  if (!matchMedia('(pointer: coarse)').matches) return;
+  const h = linkAt(e.clientX, e.clientY);
+  if (h) showPeek(h);
+});
+
+// --- превью ссылки при наведении ---
+const peek = $('peek');
+let peekFor = null, peekShowT, peekHideT;
+function place(el, r) {
+  el.classList.remove('below');
+  const w = el.offsetWidth, h = el.offsetHeight;
+  let top = r.top - h - 8;
+  if (top < 52) { top = r.bottom + 8; el.classList.add('below'); }
+  el.style.left = Math.min(Math.max(r.left + r.width / 2 - w / 2, 8), innerWidth - w - 8) + 'px';
+  el.style.top = top + 'px';
+}
+function showPeek(h) {
+  peekFor = h;
+  const t = targetOf(h.link);
+  if (!t) peek.innerHTML = `<h4>${esc(h.link.title)} <small>— такой заметки нет</small></h4><div class="hint">Ctrl+клик — создать её</div>`;
+  else {
+    const ex = excerpt(t, h.link.frag);
+    peek.innerHTML = `<h4>${esc(nameOf(t))}${h.link.frag ? ` <small>› ${esc(h.link.frag)}</small>` : ''}</h4>
+      <pre>${ex.body || '<i style="opacity:.5">пусто</i>'}</pre>
+      <div class="hint">${ex.missing ? 'Такой части в заметке не нашлось · ' : ''}Ctrl+клик или клик здесь — открыть</div>`;
+  }
+  peek.classList.remove('show');
+  place(peek, h.rect);
+  void peek.offsetWidth;
+  peek.classList.add('show');
+}
+function hidePeek(now) {
+  clearTimeout(peekHideT);
+  const go = () => { peek.classList.remove('show'); peekFor = null; };
+  now ? go() : (peekHideT = setTimeout(go, 220));
+}
+peek.addEventListener('mouseenter', () => clearTimeout(peekHideT));
+peek.addEventListener('mouseleave', () => hidePeek());
+peek.addEventListener('click', () => { if (peekFor) { const l = peekFor.link; hidePeek(true); openLink(l); } });
+
+// --- автодополнение после [[ ---
+const ac = $('ac');
+let acItems = [], acIdx = 0, acCtx = null;
+function acContext() {
+  const sel = getSelection();
+  if (!sel.isCollapsed || sel.anchorNode?.nodeType !== 3 || !textEl.contains(sel.anchorNode)) return null;
+  const before = sel.anchorNode.data.slice(0, sel.anchorOffset);
+  const m = /\[\[([^\[\]\n]*)$/.exec(before);
+  return m ? { node: sel.anchorNode, start: sel.anchorOffset - m[1].length, end: sel.anchorOffset, q: m[1] } : null;
+}
+function autocomplete() {
+  acCtx = acContext();
+  if (!acCtx) return closeAc();
+  const q = acCtx.q, hash = q.indexOf('#');
+  if (hash >= 0) { // после # — разделы выбранной заметки
+    const t = targetOf({ title: q.slice(0, hash) }), hq = q.slice(hash + 1).toLowerCase();
+    const heads = t ? [...t.text.matchAll(/^#{1,6}\s*(.+)$/gm)].map(m => m[1].trim()).filter(h => h.toLowerCase().includes(hq)) : [];
+    acItems = heads.slice(0, 8).map(h => ({ label: h, sub: 'раздел', insert: q.slice(0, hash + 1) + h }));
+  } else {
+    const lq = q.toLowerCase();
+    const found = notes.filter(n => n !== cur && !isEmpty(n) && nameOf(n).toLowerCase().includes(lq))
+      .sort((a, b) => nameOf(a).toLowerCase().indexOf(lq) - nameOf(b).toLowerCase().indexOf(lq) || b.updated - a.updated)
+      .slice(0, 8).map(n => ({ label: nameOf(n), insert: nameOf(n) }));
+    acItems = found;
+    if (q.trim() && !byName(q)) acItems.push({ label: `Создать «${q.trim()}»`, insert: q.trim(), create: true });
+  }
+  if (!acItems.length) return closeAc();
+  acIdx = Math.min(acIdx, acItems.length - 1);
+  drawAc();
+}
+function drawAc() {
+  ac.innerHTML = acItems.map((it, i) => `<div class="${i === acIdx ? 'on' : ''}" data-i="${i}">${it.create ? '<span class="mk">＋</span> ' : ''}${esc(it.label)}${it.sub ? `<small>${it.sub}</small>` : ''}</div>`).join('');
+  const sel = getSelection();
+  let r = sel.rangeCount ? sel.getRangeAt(0).getClientRects()[0] : null;
+  if (!r) r = textEl.getBoundingClientRect();
+  ac.style.left = Math.min(r.left, innerWidth - ac.offsetWidth - 8) + 'px';
+  ac.style.top = Math.min(r.bottom + 6, innerHeight - ac.offsetHeight - 8) + 'px';
+  ac.classList.add('show');
+}
+function closeAc() { ac.classList.remove('show'); acItems = []; acIdx = 0; }
+function pickAc(i) {
+  const it = acItems[i], c = acCtx;
+  if (!it || !c || !c.node.isConnected) return closeAc();
+  if (it.create) createNote(it.insert);
+  const after = c.node.data.slice(c.end, c.end + 2);
+  textEl.focus();
+  const sel = getSelection(); sel.removeAllRanges(); sel.addRange(nodeRange(c.node, c.start, c.end));
+  document.execCommand('insertText', false, it.insert + (after === ']]' ? '' : ']]'));
+  closeAc();
+  paint();
+}
+ac.addEventListener('mousedown', e => { e.preventDefault(); const d = e.target.closest('[data-i]'); if (d) pickAc(+d.dataset.i); });
+textEl.addEventListener('keydown', e => {
+  if (!ac.classList.contains('show')) return;
+  if (e.key === 'ArrowDown') { e.preventDefault(); acIdx = (acIdx + 1) % acItems.length; drawAc(); }
+  else if (e.key === 'ArrowUp') { e.preventDefault(); acIdx = (acIdx - 1 + acItems.length) % acItems.length; drawAc(); }
+  else if (e.key === 'Enter' || e.key === 'Tab') { e.preventDefault(); pickAc(acIdx); }
+  else if (e.key === 'Escape') { e.preventDefault(); closeAc(); }
+});
+textEl.addEventListener('blur', () => setTimeout(closeAc, 150));
+
+// --- выделил текст → «Ссылка на цитату» (кладёт [[Заметка#цитата]] в буфер обмена) ---
+const quoteBtn = $('quoteBtn');
+const quoteSoon = later(() => {
+  const sel = getSelection(), text = sel.toString().replace(/\s+/g, ' ').trim();
+  if (!cur || sel.isCollapsed || !textEl.contains(sel.anchorNode) || text.length < 3 || text.length > 300 || /\n/.test(sel.toString().trim())) {
+    return quoteBtn.classList.remove('show');
+  }
+  quoteBtn.textContent = '🔗 Ссылка на цитату';
+  const r = sel.getRangeAt(0).getBoundingClientRect();
+  quoteBtn.classList.add('show');
+  quoteBtn.style.left = Math.min(Math.max(r.left + r.width / 2 - quoteBtn.offsetWidth / 2, 8), innerWidth - quoteBtn.offsetWidth - 8) + 'px';
+  quoteBtn.style.top = Math.max(r.top - quoteBtn.offsetHeight - 8, 52) + 'px';
+}, 250);
+document.addEventListener('selectionchange', () => { if (view === 'notes') quoteSoon(); });
+quoteBtn.addEventListener('mousedown', e => e.preventDefault());
+quoteBtn.onclick = () => {
+  let frag = getSelection().toString().replace(/\s+/g, ' ').replace(/[\[\]|#]/g, '').trim();
+  if (frag.length > 80) frag = frag.slice(0, 80).replace(/\s+\S*$/, ''); // цитата узнаётся и по началу
+  api.send('clipboard-write', `[[${nameOf(cur)}#${frag}]]`);
+  quoteBtn.textContent = 'Скопировано ✓ — вставь в любую заметку';
+  setTimeout(() => quoteBtn.classList.remove('show'), 1400);
+};
+
+// --- обратные ссылки: кто ссылается на эту заметку ---
+function drawBacklinks() {
+  if (!cur) { $('blList').innerHTML = ''; $('blCount').textContent = 0; return; }
+  const name = nameOf(cur).toLowerCase(), out = [];
+  for (const n of notes) {
+    if (n === cur) continue;
+    const lines = plain(n.text).split('\n').filter(line => [...line.matchAll(LINK)].some(m => parseLink(m[1]).title.toLowerCase() === name));
+    if (lines.length) out.push({ n, lines });
+  }
+  $('blCount').textContent = out.length;
+  $('blList').innerHTML = out.map(({ n, lines }) => `<div class="bl" data-id="${esc(n.id)}"><b>${esc(nameOf(n))}</b>${lines.slice(0, 2).map(l =>
+    `<span>${esc(l.trim()).replace(/\[\[([^\[\]]+?)\]\]/g, '<mark>[[$1]]</mark>')}</span>`).join('')}</div>`).join('')
+    || '<div class="empty-links">Пока никто не ссылается. Напиши [[' + esc(nameOf(cur)) + ']] в другой заметке.</div>';
+}
+$('blList').addEventListener('click', e => { const b = e.target.closest('[data-id]'); if (b) openNote(b.dataset.id); });
+$('linksHead').onclick = () => $('links').classList.toggle('shut');
+
+// --- переименовал заметку → ссылки на неё в других заметках обновляются ---
+let titleAtFocus = null;
+titleEl.addEventListener('focus', () => { titleAtFocus = cur ? cur.title.trim() : null; });
+titleEl.addEventListener('blur', () => commitRename());
+function commitRename() {
+  const old = titleAtFocus;
+  titleAtFocus = document.activeElement === titleEl && cur ? cur.title.trim() : null;
+  if (!cur || !old) return;
+  const now = cur.title.trim();
+  if (!now || now.toLowerCase() === old.toLowerCase()) return;
+  const re = new RegExp('\\[\\[' + escRe(old) + '(?=[\\]#|])', 'gi');
+  for (const n of notes) {
+    if (n === cur || n.text.search(re) < 0) continue;
+    n.text = n.text.replace(re, '[[' + now);
+    api.send('note-save', { id: n.id, title: n.title, text: n.text });
+  }
+}
+
+// ================= Орфография (общая логика — spellcore.js) =================
+const sp = makeSpell(api);
+const isBad = sp.isBad;
+const spellSoon = later(async () => {
+  await sp.check(textNodes().flatMap(n => n.data.replace(LINK, m => ' '.repeat(m.length)).match(WORD) || []));
+  paint();
+}, 600);
+
+let snapshot = {};
+function countWords(t) {
+  const c = {};
+  // пути картинок и ссылки — не слова
+  for (const m of t.replace(IMGTOK, ' ').replace(LINK, ' ').matchAll(WORD)) { const w = m[0].toLowerCase(); if (w.length >= 2) c[w] = (c[w] || 0) + 1; }
+  return c;
+}
+function learn(text) {
+  const now = countWords(text), d = {};
+  for (const w in now) if (now[w] > (snapshot[w] || 0)) d[w] = now[w] - (snapshot[w] || 0);
+  snapshot = now;
+  sp.bump(d);
+}
+
+// --- наведение: на ссылку — превью, на слово с ошибкой — варианты ---
+const pop = $('sugg');
+let popFor = null, showTimer, hideTimer, raf = 0;
+textEl.addEventListener('mousemove', e => {
+  if (raf) return;
+  const { clientX: x, clientY: y } = e;
+  raf = requestAnimationFrame(() => {
+    raf = 0;
+    const l = linkAt(x, y);
+    if (l) {
+      clearTimeout(showTimer); clearTimeout(peekHideT);
+      if (peekFor && peekFor.node === l.node && peekFor.start === l.start && peek.classList.contains('show')) return;
+      clearTimeout(peekShowT);
+      peekShowT = setTimeout(() => showPeek(l), 300);
+      return;
+    }
+    clearTimeout(peekShowT);
+    if (peek.classList.contains('show')) hidePeek();
+    const w = wordAt(x, y);
+    if (w && isBad(w.word)) {
+      clearTimeout(hideTimer);
+      if (popFor && popFor.node === w.node && popFor.start === w.start && pop.classList.contains('show')) return;
+      clearTimeout(showTimer);
+      showTimer = setTimeout(() => showPop(w), 250);
+    } else {
+      clearTimeout(showTimer);
+      if (pop.classList.contains('show')) hidePop();
+    }
+  });
+});
+textEl.addEventListener('mouseleave', () => { clearTimeout(showTimer); clearTimeout(peekShowT); hidePop(); hidePeek(); });
+textEl.addEventListener('scroll', () => { hidePop(true); hidePeek(true); closeAc(); quoteBtn.classList.remove('show'); });
+pop.addEventListener('mouseenter', () => clearTimeout(hideTimer));
+pop.addEventListener('mouseleave', () => hidePop());
+pop.addEventListener('mousedown', e => e.preventDefault()); // не забирать фокус у текста — иначе не заменить слово
+
+async function showPop(w) {
+  popFor = w;
+  const list = await sp.suggestions(w.word);
+  if (popFor !== w) return;
+  pop.innerHTML = `<div class="opts">${list.map(s =>
+      `<button class="opt" data-s="${esc(s)}">${esc(s)}${sp.freq(s) >= 2 ? '<i title="Ты часто пишешь это слово"></i>' : ''}</button>`).join('')
+      || '<span class="none">Нет вариантов</span>'}</div>
+    <div class="foot"><button data-act="add">＋ В словарь</button><button data-act="skip">Пропустить</button></div>`;
+  pop.classList.remove('show');
+  place(pop, w.rect);
+  void pop.offsetWidth; // перезапуск анимации появления
+  pop.classList.add('show');
+}
+function hidePop(now) {
+  clearTimeout(hideTimer);
+  const go = () => { pop.classList.remove('show'); popFor = null; };
+  now ? go() : (hideTimer = setTimeout(go, 220));
+}
+pop.addEventListener('click', e => {
+  const w = popFor, b = e.target.closest('button');
+  if (!w || !b) return;
+  if (b.dataset.s) return replaceWord(w, b.dataset.s);
+  if (b.dataset.act === 'add') sp.addWord(w.word);
+  if (b.dataset.act === 'skip') sp.ignore(w.word);
+  hidePop(true);
+  paint();
+});
+function replaceWord(w, s) {
+  hidePop(true);
+  if (!w.node.isConnected || w.node.data.substr(w.start, w.word.length) !== w.word) return; // текст успел измениться
+  textEl.focus();
+  const sel = getSelection();
+  sel.removeAllRanges(); sel.addRange(nodeRange(w.node, w.start, w.start + w.word.length));
+  document.execCommand('insertText', false, s); // так работает Ctrl+Z
+  sp.bump({ [s.toLowerCase()]: 1, [w.word.toLowerCase()]: -1 }); // выбранное — чаще, опечатку — забыть
+  snapshot = countWords(readText());
+}
+
+// ================= Граф и карты =================
+function graphData() {
+  const nodes = notes.filter(n => !isEmpty(n)).map(n => ({ id: n.id, name: nameOf(n) }));
+  const ids = new Map(nodes.map(n => [n.name.toLowerCase(), n.id])), ghosts = new Map(), edges = [];
+  for (const n of notes) for (const l of linksOf(n)) {
+    if (!l.title) continue;
+    const key = l.title.toLowerCase();
+    let id = ids.get(key);
+    if (!id) { id = 'ghost:' + key; if (!ghosts.has(id)) ghosts.set(id, { id, name: l.title, ghost: true }); }
+    if (id !== n.id) edges.push({ a: n.id, b: id });
+  }
+  return { nodes: [...nodes, ...ghosts.values()], edges };
+}
+const graph = initGraph($('v-graph'), {
+  getData: graphData,
+  onOpen: node => openNote(node.ghost ? createNote(node.name).id : node.id),
+});
+const map = initMap($('v-map'), {
+  api, esc, nameOf,
+  getNotes: () => notes.filter(n => !isEmpty(n)),
+  openNote,
+});
+
+// ================= Синхронизация с телефоном =================
+let toastT;
+function toast(msg) {
+  $('toast').textContent = msg;
+  $('toast').classList.add('show');
+  clearTimeout(toastT);
+  toastT = setTimeout(() => $('toast').classList.remove('show'), 4500);
+}
+let syncing = false;
+async function refreshSync(refresh) {
+  if (syncing || !api.invoke) return;
+  const st = await api.invoke('sync-status', !!refresh) || {};
+  const out = $('syncOut'), inc = $('syncIn'), stat = $('syncStat');
+  out.hidden = !st.out; inc.hidden = !st.inc;
+  out.querySelector('b').textContent = st.out || '';
+  inc.querySelector('b').textContent = st.inc || '';
+  out.disabled = !!st.offline;
+  out.title = st.offline ? 'Нет сети — отправишь, когда появится'
+    : st.conflicts ? `${st.conflicts} изменено и здесь, и на другом устройстве — сначала нажми «Загрузить»` : 'Отправить изменения в облако';
+  inc.title = 'Загрузить изменения с других устройств';
+  stat.classList.remove('warn');
+  lastStatus = st;
+  if (st.expired) { stat.textContent = '⚠ Войти в Google'; stat.title = 'Google попросил войти заново'; stat.classList.add('warn'); out.hidden = true; }
+  else if (st.failed) { stat.textContent = '⚠ ошибка облака'; stat.title = driveError(st.failed); stat.classList.add('warn'); out.disabled = true; }
+  else if (st.password) { stat.textContent = '🔒 нужен пароль'; stat.title = 'Заметки в облаке зашифрованы — введи пароль'; stat.classList.add('warn'); out.hidden = true; }
+  else if (!st.connected) { stat.textContent = ''; stat.title = ''; }
+  else if (st.offline) { stat.textContent = '☁ нет сети'; stat.title = 'Облако недоступно: ' + (st.error || ''); }
+  else if (!st.out && !st.inc) { stat.textContent = '☁ ✓'; stat.title = 'Всё синхронизировано'; }
+  else stat.textContent = '';
+}
+let lastStatus = {};
+const driveError = e => e === 'drive-api-off'
+  ? 'В твоём проекте Google Cloud не включён Google Drive API. Включи его (APIs & Services → Library → Google Drive API → Enable), подожди пару минут и нажми ☁ снова.'
+  : e === 'drive-no-permission'
+    ? 'Google не дал доступ к папке приложения. Отключи и подключи Google Диск снова — при входе оставь галочку доступа к данным приложения.'
+    : 'Google Диск ответил ошибкой: ' + e;
+
+// --- настройки: подключение Google Диска и шифрование ---
+const spop = $('syncPop');
+async function drawSyncPop(msg = '') {
+  const info = await api.invoke('sync-info') || {}, st = lastStatus;
+  const pass = st.password ? 'need' : info.encrypted ? 'on' : 'off';
+  spop.innerHTML = `<h4>Синхронизация с телефоном</h4>
+    ${info.connected
+      ? `<div class="ok">✓ ${info.test ? 'Тестовое облако' : 'Google Диск подключён'}</div>
+         <p class="hint">Приложение видит только свою скрытую папку на Диске — остальные файлы ему недоступны.</p>
+         <div class="btns"><button data-a="disc">Отключить</button></div>`
+      : `<p>Заметки, группы и карты будут ходить между ПК и телефоном через твой Google Диск.
+           Приложение видит только свою скрытую папку — остальной Диск ему недоступен.</p>
+         <div class="btns"><button class="primary" data-a="conn">${st.expired ? 'Войти в Google снова' : 'Подключить Google Диск'}</button></div>`}
+    <hr><h5>Шифрование паролем ${pass === 'on' ? '— включено 🔒' : pass === 'need' ? '— нужен пароль' : '— выключено'}</h5>
+    ${pass === 'need'
+      ? `<p class="hint">Заметки в облаке зашифрованы. Введи тот же пароль, что на другом устройстве.</p>
+         <input type="password" id="spP1" placeholder="Пароль" autocomplete="off"><div class="btns"><button class="primary" data-a="enter">Ввести</button></div>`
+      : pass === 'on'
+        ? `<p class="hint">Файлы в облаке нельзя прочитать без пароля — даже если кто-то войдёт в твой Google.</p>
+           <input type="password" id="spP1" placeholder="Новый пароль (от 8 символов)" autocomplete="off">
+           <input type="password" id="spP2" placeholder="Повтори новый пароль" autocomplete="off">
+           <div class="btns"><button data-a="set">Сменить пароль</button><button data-a="off">Выключить</button></div>`
+        : `<p class="hint">Файлы в облаке нельзя будет прочитать без пароля — даже если кто-то войдёт в твой Google.
+             Пароль вводится один раз на каждом устройстве. Забудешь — копию в облаке не открыть (заметки на устройствах останутся).</p>
+           <input type="password" id="spP1" placeholder="Придумай пароль (от 8 символов)" autocomplete="off">
+           <input type="password" id="spP2" placeholder="Повтори пароль" autocomplete="off">
+           <div class="btns"><button class="primary" data-a="set">Включить шифрование</button></div>`}
+    <div class="msg">${esc(msg || (st.failed ? driveError(st.failed) : ''))}</div>`;
+}
+const openPop = () => { spop.classList.add('show'); drawSyncPop(); };
+$('syncCfg').onclick = () => spop.classList.contains('show') ? spop.classList.remove('show') : openPop();
+$('syncStat').onclick = () => lastStatus.expired ? connectGoogle() : openPop();
+document.addEventListener('pointerdown', e => { if (!e.target.closest('#syncPop, #syncCfg, #syncStat')) spop.classList.remove('show'); });
+async function connectGoogle() {
+  openPop();
+  drawSyncPop('Открылся браузер — войди в Google и нажми «Разрешить». Окно браузера потом можно закрыть.');
+  const r = await api.invoke('sync-connect') || {};
+  await refreshSync(true);
+  drawSyncPop(r.error ? (r.error === 'timeout' ? 'Не дождался входа — попробуй ещё раз.' : 'Не получилось войти: ' + r.error) : 'Готово! Google Диск подключён.');
+}
+let discArmed = false;
+spop.addEventListener('click', async e => {
+  const a = e.target.closest('[data-a]')?.dataset.a;
+  if (!a) return;
+  const p1 = $('spP1')?.value || '', p2 = $('spP2')?.value || '';
+  if (a === 'conn') return connectGoogle();
+  if (a === 'disc') {
+    if (!discArmed) { discArmed = true; e.target.classList.add('armed'); e.target.textContent = 'Точно отключить?'; setTimeout(() => { discArmed = false; drawSyncPop(); }, 3000); return; }
+    discArmed = false;
+    await api.invoke('sync-disconnect');
+    await refreshSync(true);
+    return drawSyncPop('Отключено. Заметки на этом ПК остались на месте.');
+  }
+  if (a === 'set') {
+    if (p1.length < 8) return drawSyncPop('Пароль — минимум 8 символов.');
+    if (p1 !== p2) return drawSyncPop('Пароли не совпадают.');
+    const r = await api.invoke('sync-password', { password: p1, rewrite: true });
+    await refreshSync(true);
+    return drawSyncPop(r.warn ? 'Пароль сохранён.' : 'Шифрование включено. На телефоне нужно будет ввести этот же пароль.');
+  }
+  if (a === 'off') {
+    const r = await api.invoke('sync-password', { password: '', rewrite: true });
+    await refreshSync(true);
+    return drawSyncPop(r.warn ? 'Не получилось расшифровать облако: ' + r.warn : 'Шифрование выключено.');
+  }
+  if (a === 'enter') {
+    await api.invoke('sync-password', { password: p1, rewrite: false });
+    await refreshSync(true);
+    return drawSyncPop(lastStatus.password ? 'Неверный пароль.' : 'Пароль подошёл.');
+  }
+});
+$('syncOut').onclick = async () => {
+  save.flush();
+  syncing = true; $('syncOut').disabled = true;
+  const r = await api.invoke('sync-send') || {};
+  syncing = false;
+  if (r.error) toast(r.error === 'busy' ? 'Синхронизация уже идёт…' : 'Не получилось отправить: ' + r.error);
+  else toast(`Отправлено: ${r.sent}` + (r.blocked ? ` · ${r.blocked} изменено и на другом устройстве — нажми «Загрузить», потом снова «Отправить»` : ''));
+  refreshSync(true);
+};
+$('syncIn').onclick = async () => {
+  save.flush();
+  syncing = true; $('syncIn').disabled = true;
+  const r = await api.invoke('sync-load') || {};
+  syncing = false; $('syncIn').disabled = false;
+  if (r.error) { toast('Не получилось загрузить: ' + r.error); return refreshSync(true); }
+  const msg = `Загружено: ${r.loaded}` + (r.conflicts ? ` · ${r.conflicts} конфликт(а): вторая версия сохранена копией с пометкой «с другого устройства»` : '');
+  // заметки и карты в окне устарели — перезагружаем окно и возвращаемся туда же
+  try { sessionStorage.setItem('afterSync', JSON.stringify({ msg, view, cur: cur && cur.id })); } catch {}
+  location.reload();
+};
+addEventListener('focus', () => refreshSync(true)); // вернулся к окну — проверить облако
+setInterval(() => refreshSync(true), 60000);
+
+// ================= Запуск =================
+(async () => {
+  [notes, groups] = await Promise.all([api.invoke('notes-list'), api.invoke('groups-list'), sp.loadWords()]);
+  notes = Array.isArray(notes) ? notes : [];
+  groups = Array.isArray(groups) ? groups : [];
+  let after = null;
+  try { after = JSON.parse(sessionStorage.getItem('afterSync')); sessionStorage.removeItem('afterSync'); } catch {}
+  const back = after && notes.find(n => n.id === after.cur);
+  back ? select(back.id) : notes.length ? select(sorted()[0].id) : newNote();
+  showView(after && after.view || 'notes');
+  if (after) toast(after.msg);
+  refreshSync(true);
+})();
+</script>
+<script>if ('serviceWorker' in navigator) navigator.serviceWorker.register('sw.js');</script>
+</body>
+</html>
