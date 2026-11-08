@@ -96,13 +96,14 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
   const node = id => m.nodes.find(n => n.id === id);
 
   // ---------- вид: сдвиг и масштаб ----------
-  function applyView() {
+  // quick — во время щипка: только сдвиг и масштаб картинкой; подгонка текста и подписей — один раз, когда отпустишь пальцы
+  function applyView(quick) {
     const v = m.view;
     world.style.transform = `translate(${v.x}px, ${v.y}px) scale(${v.zoom})`;
     // при отдалении подписи, кнопки и стрелки растут обратно масштабу — чтобы оставались читаемыми;
     // текст карточек — мягче (иначе не влезает), а совсем издалека мелочи прячутся — остаётся обзор.
     // Только когда масштаб изменился: эти переменные пересчитывают стиль всех карточек — при простом сдвиге это зря
-    if (v.zoom !== lastZoom) {
+    if (!quick && v.zoom !== lastZoom) {
       lastZoom = v.zoom;
       world.style.setProperty('--k', clamp(Math.pow(1 / v.zoom, .75), 1, 2.4).toFixed(3));
       world.style.setProperty('--kt', clamp(Math.pow(1 / v.zoom, .55), 1, 2.2).toFixed(3));
@@ -110,7 +111,7 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
     }
     stage.style.backgroundSize = `${22 * v.zoom}px ${22 * v.zoom}px`;
     stage.style.backgroundPosition = `${v.x}px ${v.y}px`;
-    if (els.size) showFmt(); // панель оформления едет вместе с карточкой
+    if (els.size && !quick) showFmt(); // панель оформления едет вместе с карточкой
   }
   const toWorld = (cx, cy) => { const r = stage.getBoundingClientRect(); return { x: (cx - r.left - m.view.x) / m.view.zoom, y: (cy - r.top - m.view.y) / m.view.zoom }; };
   const center = () => { const r = stage.getBoundingClientRect(); return toWorld(r.left + r.width / 2, r.top + r.height / 2 + 20); };
@@ -525,6 +526,7 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
   // ---------- мышь: двигать поле, карточки, размер, тянуть пути ----------
   // ---------- два пальца: щипок — масштаб, движение — сдвиг (телефон и сенсорный экран) ----------
   const touches = new Map();
+  let pinchFrame = 0;
   const pinchOf = () => {
     const [a, b] = [...touches.values()], r = stage.getBoundingClientRect();
     return { d: Math.hypot(a[0] - b[0], a[1] - b[1]) || 1, x: (a[0] + b[0]) / 2 - r.left, y: (a[1] + b[1]) / 2 - r.top };
@@ -536,6 +538,7 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
     if (touches.size !== 2) return;
     const p = pinchOf();
     drag = { kind: 'pinch', d0: p.d, z0: m.view.zoom, wx: (p.x - m.view.x) / m.view.zoom, wy: (p.y - m.view.y) / m.view.zoom };
+    stage.classList.add('busy'); // карта — отдельный слой видеокарты, пока пальцы на ней
     e.stopImmediatePropagation(); // вторым пальцем не тащим карточку
     try { stage.setPointerCapture(e.pointerId); } catch {}
   }, true);
@@ -545,12 +548,13 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
     if (drag?.kind !== 'pinch' || touches.size < 2) return;
     const p = pinchOf(), z = clamp(drag.z0 * p.d / drag.d0, 0.2, 3);
     m.view.zoom = z; m.view.x = p.x - drag.wx * z; m.view.y = p.y - drag.wy * z; // точка между пальцами остаётся под пальцами
-    applyView();
+    if (!pinchFrame) pinchFrame = requestAnimationFrame(() => { pinchFrame = 0; applyView(true); }); // не чаще кадра экрана
+    fmtEl.classList.remove('show');
     e.stopImmediatePropagation();
   }, true);
   const touchEnd = e => {
     if (!touches.delete(e.pointerId) || drag?.kind !== 'pinch') return;
-    if (touches.size < 2) { drag = null; stage.classList.remove('busy', 'panning'); save(); }
+    if (touches.size < 2) { drag = null; cancelAnimationFrame(pinchFrame); pinchFrame = 0; applyView(); stage.classList.remove('busy', 'panning'); save(); }
     e.stopImmediatePropagation();
   };
   stage.addEventListener('pointerup', touchEnd, true);
