@@ -32,6 +32,7 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
       <button data-act="new" title="Новая карта">＋ Карта</button>
       <button data-act="rename" title="Переименовать карту">✎</button>
       <button data-act="del" title="Удалить карту">🗑</button>
+      <button data-act="undo" title="Отменить (Ctrl+Z)">↶</button><button data-act="redo" title="Вернуть (Ctrl+Y)">↷</button>
       <span class="sep"></span>
       <button data-act="box" title="Выделить несколько карточек рамкой (на ПК ещё — Shift + тянуть по пустому месту, Shift/Ctrl + клик по карточке)">⬚ Выделить</button>
       <span class="sep"></span>
@@ -40,7 +41,7 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
       <button data-add="image">Картинка</button>
       <button data-add="video">YouTube</button>
       <button data-add="mp4">Видео-файл</button>
-      <span class="hint">Двойной клик — карточка · тяни за точку — путь · Shift + тянуть — выделить несколько · наведи на путь — ✕ · Ctrl+V — картинка или ссылка</span>
+      <span class="hint">Двойной клик — карточка · тяни за точку — путь · Shift + тянуть — выделить несколько · Ctrl+Z / Ctrl+C / Ctrl+V / Ctrl+D / Ctrl+A · наведи на путь — ✕ · Ctrl+V — картинка или ссылка</span>
     </div>
     <div class="m-pop glass-pop"></div>
     <div class="m-fmt glass-pop" role="toolbar" aria-label="Оформление текста">
@@ -97,7 +98,53 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
   const els = new Map(), players = new Map(); // id карточки → { t, dur, playing, muted, cut }
   const ps = id => players.get(id) || (players.set(id, { t: 0, dur: 0, playing: false, muted: false }), players.get(id));
   let saveT;
-  const save = () => { clearTimeout(saveT); saveT = setTimeout(() => api.send('maps-save', maps), 400); };
+  const save = () => { clearTimeout(saveT); saveT = setTimeout(() => { remember(); api.send('maps-save', maps); }, 400); };
+  // отмена и повтор (Ctrl+Z / Ctrl+Y): своя история у каждой карты, до 100 шагов; положение камеры в неё не входит
+  const hist = new Map();
+  const snap = () => JSON.stringify({ nodes: m.nodes, edges: m.edges });
+  function remember() {
+    if (!m) return;
+    const s = snap(), h = hist.get(m.id);
+    if (!h) return hist.set(m.id, { list: [s], i: 0 });
+    if (h.list[h.i] === s) return;
+    h.list.length = h.i + 1; // после отмены новая правка стирает «вперёд»
+    h.list.push(s); h.i++;
+    if (h.list.length > 100) { h.list.shift(); h.i--; }
+  }
+  function travel(d) {
+    if (!m) return;
+    if (saveT) { clearTimeout(saveT); remember(); } // несохранённая правка — тоже шаг
+    const h = hist.get(m.id), j = h ? h.i + d : -1;
+    if (!h || j < 0 || j >= h.list.length) return;
+    h.i = j;
+    const s = JSON.parse(h.list[j]);
+    m.nodes = s.nodes; m.edges = s.edges;
+    sel = null; linkFrom = null; picked.clear(); hideCut(true);
+    for (const el of els.values()) el.remove(); // карточки — заново, с отменённым содержимым
+    els.clear(); players.clear();
+    sync(); save();
+  }
+  // копировать / вставить / дублировать карточки (со связями между ними)
+  let clip = null;
+  function collect() {
+    const ids = new Set(picked.size ? picked : sel && node(sel) ? [sel] : []);
+    if (!ids.size) return null;
+    return { nodes: m.nodes.filter(n => ids.has(n.id)).map(n => JSON.parse(JSON.stringify(n))),
+      edges: m.edges.filter(e => ids.has(e.from) && ids.has(e.to)).map(e => ({ ...e })), n: 0 };
+  }
+  function pasteCards(c) {
+    const step = 30 * ++c.n, ids = new Map(), add = c.nodes.map(n => { const id = crypto.randomUUID(); ids.set(n.id, id); return { ...JSON.parse(JSON.stringify(n)), id, x: n.x + step, y: n.y + step }; });
+    m.nodes.push(...add);
+    m.edges.push(...c.edges.map(e => ({ ...e, id: crypto.randomUUID(), from: ids.get(e.from), to: ids.get(e.to) })));
+    picked.clear(); sel = null;
+    if (add.length === 1) sel = add[0].id; else add.forEach(n => picked.add(n.id));
+    sync(); save();
+  }
+  function moveSel(dx, dy) {
+    const ids = picked.size ? [...picked] : sel && node(sel) ? [sel] : [];
+    for (const id of ids) { const n = node(id); n.x += dx; n.y += dy; place(els.get(id), n); }
+    if (ids.length) { drawEdges(); showFmt(); save(); }
+  }
   const node = id => m.nodes.find(n => n.id === id);
 
   // ---------- вид: сдвиг и масштаб ----------
@@ -750,10 +797,22 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
   document.addEventListener('keydown', e => {
     if (!visible || typing(e.target)) return;
     if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSel(); }
+    const ctrl = e.ctrlKey || e.metaKey;
+    if (ctrl && (e.code === 'KeyZ' || e.code === 'KeyY')) { e.preventDefault(); travel(e.code === 'KeyY' || e.shiftKey ? 1 : -1); }
+    if (ctrl && e.code === 'KeyA') { e.preventDefault(); picked.clear(); m.nodes.forEach(n => picked.add(n.id)); sel = null; sync(); }
+    if (ctrl && e.code === 'KeyC') { const c = collect(); if (c) { clip = { ...c, tag: 'moe-map-cards:' + crypto.randomUUID() }; api.send('clipboard-write', clip.tag); } }
+    if (ctrl && e.code === 'KeyX') { const c = collect(); if (c) { clip = { ...c, tag: 'moe-map-cards:' + crypto.randomUUID() }; api.send('clipboard-write', clip.tag); deleteSel(); } }
+    if (ctrl && e.code === 'KeyD') { e.preventDefault(); const c = collect(); if (c) pasteCards(c); }
+    if (!ctrl && /^Arrow/.test(e.key) && (picked.size || (sel && node(sel)))) { // стрелки — сдвиг, с Shift — крупнее
+      e.preventDefault();
+      const k = e.shiftKey ? 50 : 10;
+      moveSel(e.key === 'ArrowLeft' ? -k : e.key === 'ArrowRight' ? k : 0, e.key === 'ArrowUp' ? -k : e.key === 'ArrowDown' ? k : 0);
+    }
     if (e.key === 'Escape') { closePop(); sel = null; picked.clear(); boxMode = false; hideCut(true); sync(); }
   });
   document.addEventListener('paste', async e => {
     if (!visible || typing(e.target)) return;
+    if (clip && e.clipboardData.getData('text') === clip.tag) { e.preventDefault(); return pasteCards(clip); }
     const files = [...e.clipboardData.files].filter(f => f.type.startsWith('image/'));
     if (files.length) {
       e.preventDefault();
@@ -806,6 +865,7 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
     els.clear(); players.clear();
     try { localStorage.setItem('map', m.id); } catch {}
     fillSelect(); applyView(); sync();
+    remember();
   }
   selEl.onchange = () => openMap(maps.find(x => x.id === selEl.value));
   let delArm;
@@ -813,6 +873,7 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
     const b = e.target.closest('button');
     if (!b) return;
     const act = b.dataset.act, add = b.dataset.add;
+    if (act === 'undo' || act === 'redo') return travel(act === 'undo' ? -1 : 1);
     if (act === 'box') { boxMode = !boxMode; if (!boxMode) picked.clear(); return sync(); }
     if (act === 'new') { openMap(newMap('Карта ' + (maps.length + 1))); save(); }
     if (act === 'rename') openPop(b, `<input class="field" value="${esc(m.name)}" maxlength="60" aria-label="Название карты">`, p => {

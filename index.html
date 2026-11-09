@@ -601,10 +601,10 @@
         </div>
         <div class="meta"><span id="meta"></span> · <kbd>[[</kbd> ссылка · <kbd>Ctrl</kbd>+клик — перейти</div>
         <div class="fmtbar" id="fmtbar" role="toolbar" aria-label="Оформление текста">
-          <select id="fHead" title="Заголовок" aria-label="Заголовок"><option value="x" hidden>Заголовок</option><option value="0">Обычный текст</option><option value="1">Заголовок 1</option><option value="2">Заголовок 2</option><option value="3">Заголовок 3</option></select>
-          <button data-md="b" title="Жирный (Ctrl+B)"><b>Ж</b></button><button data-md="i" title="Курсив (Ctrl+I)"><i>К</i></button><button data-md="s" title="Зачёркнутый"><s>З</s></button><button data-md="mark" title="Выделить маркером"><span class="mkr">М</span></button><button data-md="code" title="Код">&lt;/&gt;</button>
+          <select id="fHead" title="Заголовок (Ctrl+1, Ctrl+2, Ctrl+3; обычный текст — Ctrl+0)" aria-label="Заголовок"><option value="x" hidden>Заголовок</option><option value="0">Обычный текст</option><option value="1">Заголовок 1</option><option value="2">Заголовок 2</option><option value="3">Заголовок 3</option></select>
+          <button data-md="b" title="Жирный (Ctrl+B)"><b>Ж</b></button><button data-md="i" title="Курсив (Ctrl+I)"><i>К</i></button><button data-md="s" title="Зачёркнутый (Ctrl+Shift+X)"><s>З</s></button><button data-md="mark" title="Выделить маркером (Ctrl+Shift+H)"><span class="mkr">М</span></button><button data-md="code" title="Код (Ctrl+E)">&lt;/&gt;</button>
           <i class="sep"></i>
-          <button data-md="ul" title="Список">•</button><button data-md="ol" title="Нумерованный список">1.</button><button data-md="task" title="Задача с галочкой">☑</button><button data-md="q" title="Цитата">❝</button><button data-md="hr" title="Черта">—</button><button data-md="link" title="Ссылка на заметку">[[ ]]</button>
+          <button data-md="ul" title="Список (Ctrl+Shift+8)">•</button><button data-md="ol" title="Нумерованный список (Ctrl+Shift+7)">1.</button><button data-md="task" title="Задача с галочкой (Ctrl+L)">☑</button><button data-md="q" title="Цитата (Ctrl+Shift+.)">❝</button><button data-md="hr" title="Черта">—</button><button data-md="link" title="Ссылка на заметку (Ctrl+K)">[[ ]]</button>
           <i class="sep"></i>
           <button data-md="dec" title="Мельче">A−</button><span id="fSize" class="fsz">15</span><button data-md="inc" title="Крупнее">A+</button>
           <select id="fFont" title="Шрифт заметки" aria-label="Шрифт заметки"></select>
@@ -1043,14 +1043,14 @@ function replaceText(a, b, str) {
     str.split('\n').forEach((p, i) => { if (i) document.execCommand('insertLineBreak'); if (p) document.execCommand('insertText', false, p); });
   } finally { selfBreak = was; }
 }
-function finish(a, b) { rerender(true); textEl.focus(); selectOffsets(a, b); histT = 0; edited(); } // histT = 0 — оформление отдельным шагом отмены
+function finish(a, b) { rerender(true); textEl.focus(); selectOffsets(a, b); histT = 0; const was = selfBreak; selfBreak = false; edited(); selfBreak = was; } // histT = 0 — оформление отдельным шагом отмены
 
 // своя история правок (Ctrl+Z / Ctrl+Y): браузерная сбрасывается, когда оформление перестраивается
 let hist = [], hi = -1, histT = 0;
 function histReset() { hist = [{ t: readText(), s: [0, 0] }]; hi = 0; histT = 0; }
 function histPush() {
   const t = readText();
-  if (hi < 0 || hist[hi].t === t) return;
+  if (hi < 0 || selfBreak || hist[hi].t === t) return; // selfBreak — идёт наша правка разметки: шаг запишет finish()
   const s = document.activeElement === textEl ? selOffsets() : lastSel, now = Date.now();
   hist.length = hi + 1;
   if (histT && now - histT < 1000 && hi > 0) hist[hi] = { t, s }; // набор подряд — один шаг
@@ -1234,6 +1234,12 @@ textEl.addEventListener('keydown', e => {
     if (e.code === 'KeyB') wrapSel('**');
     if (e.code === 'KeyI') wrapSel('*');
   }
+  // остальные сочетания — как подписано на кнопках панели
+  const KEYS = { KeyK: () => wrapLink(), KeyL: () => setLines('task'), KeyE: () => wrapSel('`'),
+    'S-KeyX': () => wrapSel('~~'), 'S-KeyH': () => wrapSel('=='), 'S-Digit8': () => setLines('ul'), 'S-Digit7': () => setLines('ol'), 'S-Period': () => setLines('q'),
+    Digit0: () => setLines(''), Digit1: () => setLines('h1'), Digit2: () => setLines('h2'), Digit3: () => setLines('h3') };
+  const fn = e.ctrlKey && !e.altKey && KEYS[(e.shiftKey ? 'S-' : '') + e.code];
+  if (fn) { e.preventDefault(); fn(); }
 });
 textEl.addEventListener('click', e => {
   if (e.target.classList?.contains('nimg')) { $('lightbox').querySelector('img').src = e.target.src; $('lightbox').classList.add('show'); }
