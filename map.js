@@ -25,7 +25,7 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
         </svg>
         <div class="e-bar"><span class="e-cols"></span><button class="e-cut" title="Разорвать связь">✕</button></div>
       </div>
-      <div class="m-empty"></div>
+      <div class="m-empty"></div><div class="m-box"></div>
     </div>
     <div class="m-tools glass-in">
       <select class="m-sel" title="Карта" aria-label="Карта"></select>
@@ -33,12 +33,14 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
       <button data-act="rename" title="Переименовать карту">✎</button>
       <button data-act="del" title="Удалить карту">🗑</button>
       <span class="sep"></span>
+      <button data-act="box" title="Выделить несколько карточек рамкой (на ПК ещё — Shift + тянуть по пустому месту, Shift/Ctrl + клик по карточке)">⬚ Выделить</button>
+      <span class="sep"></span>
       <button data-add="text">Текст</button>
       <button data-add="note">Заметка</button>
       <button data-add="image">Картинка</button>
       <button data-add="video">YouTube</button>
       <button data-add="mp4">Видео-файл</button>
-      <span class="hint">Двойной клик — карточка · тяни за точку — путь · наведи на путь — ✕ · Ctrl+V — картинка или ссылка</span>
+      <span class="hint">Двойной клик — карточка · тяни за точку — путь · Shift + тянуть — выделить несколько · наведи на путь — ✕ · Ctrl+V — картинка или ссылка</span>
     </div>
     <div class="m-pop glass-pop"></div>
     <div class="m-fmt glass-pop" role="toolbar" aria-label="Оформление текста">
@@ -90,6 +92,8 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
   console.assert(parseTc('1:23 Битва').t === 83 && parseTc('1:02:03').t === 3723 && parseTc('90 сек тут').label === 'тут' && parseTc('просто текст') === null, 'parseTc');
 
   let maps = [], m = null, sel = null, editing = null, visible = false, loaded = false, drag = null, linkFrom = null, lastZoom = 0;
+  const picked = new Set(); // несколько выбранных карточек (рамкой, Shift/Ctrl + клик или нажатиями в режиме «Выделить»)
+  let boxMode = false;
   const els = new Map(), players = new Map(); // id карточки → { t, dur, playing, muted, cut }
   const ps = id => players.get(id) || (players.set(id, { t: 0, dur: 0, playing: false, muted: false }), players.get(id));
   let saveT;
@@ -216,7 +220,7 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
       let el = els.get(n.id);
       if (!el) { el = nodeEl(n); world.appendChild(el); els.set(n.id, el); }
       place(el, n);
-      el.classList.toggle('sel', sel === n.id);
+      el.classList.toggle('sel', sel === n.id || picked.has(n.id));
     }
     drawEdges();
     showFmt();
@@ -260,18 +264,23 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
   });
 
   // ---------- телефон: панель выбранной карточки (связать / изменить / удалить) — вместо мыши и клавиатуры ----------
-  const actEl = q('.m-act');
+  const actEl = q('.m-act'), boxEl = q('.m-box');
   let delArmed = null, delArmT; // id карточки, удаление которой ждёт второго нажатия
   function showAct() {
-    const n = sel && node(sel), edge = !n && sel && m.edges.some(e => e.id === sel);
-    actEl.classList.toggle('show', visible && !!(n || edge || linkFrom));
-    actEl.classList.toggle('linking', !!linkFrom);
-    actEl.classList.toggle('edge', !!edge);
+    const n = sel && node(sel), edge = !n && sel && m.edges.some(e => e.id === sel), many = picked.size;
+    const mode = linkFrom ? 'linking' : many ? 'multi' : boxMode ? 'boxing' : n ? 'node' : edge ? 'edge' : '';
+    actEl.classList.toggle('show', visible && !!mode);
+    actEl.dataset.mode = mode;
+    actEl.querySelector('.m-act-hint').textContent = mode === 'linking' ? 'Нажми на карточку, с которой связать'
+      : mode === 'multi' ? 'Выбрано: ' + many : 'Обведи или отметь карточки';
+    actEl.querySelector('[data-m="cancel"]').textContent = mode === 'multi' ? 'Снять' : mode === 'boxing' ? 'Готово' : 'Отмена';
+    q('[data-act="box"]').classList.toggle('on', boxMode);
+    stage.classList.toggle('boxing', boxMode);
     stage.classList.toggle('linking', !!linkFrom);
     for (const [id, el] of els) el.classList.toggle('link-from', id === linkFrom);
     const del = actEl.querySelector('[data-m="del"]');
-    const armed = !!sel && delArmed === sel;
-    del.textContent = armed ? 'Точно удалить?' : edge ? '🗑 Удалить связь' : '🗑 Удалить';
+    const key = many ? 'multi' : sel, armed = !!key && delArmed === key;
+    del.textContent = armed ? 'Точно удалить?' : edge ? '🗑 Удалить связь' : many ? '🗑 Удалить все' : '🗑 Удалить';
     del.classList.toggle('armed', armed);
   }
   const disarm = () => { delArmed = null; clearTimeout(delArmT); };
@@ -281,14 +290,15 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
     if (!a) return;
     if (a !== 'del') disarm();
     if (a === 'link' && n) linkFrom = n.id;
-    if (a === 'cancel') linkFrom = null;
+    if (a === 'cancel') { if (linkFrom) linkFrom = null; else if (picked.size) { picked.clear(); sync(); } else boxMode = false; }
     if (a === 'edit' && n) {
       if (n.type === 'text') startEdit(n);
       else if (n.type === 'note') { if (getNotes().some(x => x.id === n.noteId)) openNote(n.noteId); }
       else editTitle(n);
     }
     if (a === 'del') {
-      if (delArmed !== sel) { disarm(); delArmed = sel; delArmT = setTimeout(() => { delArmed = null; showAct(); }, 3000); } // удаление в два нажатия
+      const key = picked.size ? 'multi' : sel;
+      if (delArmed !== key) { disarm(); delArmed = key; delArmT = setTimeout(() => { delArmed = null; showAct(); }, 3000); } // удаление в два нажатия
       else { disarm(); deleteSel(); return; }
     }
     showAct();
@@ -515,7 +525,18 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
     m.edges.push({ id: crypto.randomUUID(), from: n.id, to: clip.id });
     sync(); save();
   }
+  function togglePick(id) {
+    if (sel && node(sel) && !picked.size) picked.add(sel); // уже выбранная одна — тоже в группу
+    picked.has(id) ? picked.delete(id) : picked.add(id);
+    sel = null; disarm(); sync();
+  }
   function deleteSel() {
+    if (picked.size) {
+      m.nodes = m.nodes.filter(n => !picked.has(n.id));
+      m.edges = m.edges.filter(e => !picked.has(e.from) && !picked.has(e.to));
+      picked.clear(); sel = null;
+      return sync(), save();
+    }
     if (!sel) return;
     if (node(sel)) { m.nodes = m.nodes.filter(n => n.id !== sel); m.edges = m.edges.filter(e => e.from !== sel && e.to !== sel); }
     else m.edges = m.edges.filter(e => e.id !== sel);
@@ -585,16 +606,19 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
         if (b && b.onblur) b.onblur();
         document.activeElement.blur();
       }
-      drag = { kind: 'pan', x: e.clientX, y: e.clientY, moved: false };
-      stage.classList.add('panning');
+      if ((boxMode || e.shiftKey) && e.button === 0) drag = { kind: 'box', x: e.clientX, y: e.clientY, at, to: at };
+      else { drag = { kind: 'pan', x: e.clientX, y: e.clientY, moved: false }; stage.classList.add('panning'); }
     } else {
       const n = node(nEl.dataset.id);
-      if (sel !== n.id) { sel = n.id; sync(); }
+      if (e.shiftKey || e.ctrlKey || e.metaKey) { togglePick(n.id); e.preventDefault(); return; } // добавить или убрать из выбранных
+      if (picked.size && !picked.has(n.id) && !boxMode) { picked.clear(); sync(); }
+      if (!picked.has(n.id) && !boxMode && sel !== n.id) { sel = n.id; sync(); }
       // кнопки, панель плеера, метки, поля ввода и само видео — не тащат карточку
       if (t.closest('button, input, select, .pbar, .marks, .cutbox, .m-fmt, .pov, .player iframe, .player video, [contenteditable]')) return;
       if (t.classList.contains('mh')) drag = { kind: 'link', from: n, side: t.dataset.side, start: at };
       else if (t.classList.contains('mr')) drag = { kind: 'size', n, x: e.clientX, y: e.clientY, w: n.w, h: n.h };
-      else drag = { kind: 'move', n, x: e.clientX, y: e.clientY, nx: n.x, ny: n.y };
+      else drag = { kind: 'move', n, x: e.clientX, y: e.clientY, nx: n.x, ny: n.y,
+        group: picked.has(n.id) ? [...picked].map(node).filter(Boolean).map(g => ({ g, nx: g.x, ny: g.y })) : null };
     }
     drag.moved = false;
     e.preventDefault(); // не начинать выделение текста (синяя заливка при растягивании)
@@ -611,9 +635,20 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
       drag.x = e.clientX; drag.y = e.clientY;
       applyView();
     } else if (drag.kind === 'move') {
-      drag.n.x = Math.round(drag.nx + (e.clientX - drag.x) / z); drag.n.y = Math.round(drag.ny + (e.clientY - drag.y) / z);
+      const dx = (e.clientX - drag.x) / z, dy = (e.clientY - drag.y) / z;
+      if (!drag.moved && Math.hypot(e.clientX - drag.x, e.clientY - drag.y) < 4) return; // дрожание пальца — ещё не движение
       drag.moved = true;
-      place(els.get(drag.n.id), drag.n); drawEdges(); showFmt();
+      for (const { g, nx, ny } of drag.group || [{ g: drag.n, nx: drag.nx, ny: drag.ny }]) {
+        g.x = Math.round(nx + dx); g.y = Math.round(ny + dy);
+        place(els.get(g.id), g);
+      }
+      drawEdges(); showFmt();
+    } else if (drag.kind === 'box') {
+      drag.moved = Math.hypot(e.clientX - drag.x, e.clientY - drag.y) > 4;
+      const r = stage.getBoundingClientRect();
+      Object.assign(boxEl.style, { display: 'block', left: Math.min(drag.x, e.clientX) - r.left + 'px', top: Math.min(drag.y, e.clientY) - r.top + 'px',
+        width: Math.abs(e.clientX - drag.x) + 'px', height: Math.abs(e.clientY - drag.y) + 'px' });
+      drag.to = toWorld(e.clientX, e.clientY);
     } else if (drag.kind === 'size') {
       drag.n.w = Math.round(Math.max(160, drag.w + (e.clientX - drag.x) / z)); drag.n.h = Math.round(Math.max(60, drag.h + (e.clientY - drag.y) / z));
       drag.moved = true;
@@ -632,7 +667,15 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
     stage.classList.remove('busy', 'panning');
     tmp.style.display = 'none';
     if (linkFrom && !d.moved && d.kind !== 'link') return finishLink(d.n && d.n.id); // режим «Связать»: нажал на карточку или мимо
-    if (d.kind === 'pan' && !d.moved) { sel = null; disarm(); hideCut(true); sync(); }
+    boxEl.style.display = 'none';
+    if ((d.kind === 'pan' || d.kind === 'box') && !d.moved) { sel = null; picked.clear(); disarm(); hideCut(true); sync(); }
+    if (d.kind === 'box' && d.moved) { // всё, чего касается рамка
+      const x1 = Math.min(d.at.x, d.to.x), x2 = Math.max(d.at.x, d.to.x), y1 = Math.min(d.at.y, d.to.y), y2 = Math.max(d.at.y, d.to.y);
+      if (!e.shiftKey && !boxMode) picked.clear();
+      for (const n of m.nodes) if (n.x < x2 && n.x + n.w > x1 && n.y < y2 && n.y + n.h > y1) picked.add(n.id);
+      sel = null; disarm(); hideCut(true); sync();
+    }
+    if (d.kind === 'move' && boxMode && !d.moved) togglePick(d.n.id); // режим «Выделить»: нажатие добавляет или убирает
     if (d.kind === 'link' && d.moved) {
       const target = document.elementFromPoint(e.clientX, e.clientY)?.closest('.mn');
       if (target && target.dataset.id !== d.from.id) {
@@ -707,7 +750,7 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
   document.addEventListener('keydown', e => {
     if (!visible || typing(e.target)) return;
     if (e.key === 'Delete' || e.key === 'Backspace') { e.preventDefault(); deleteSel(); }
-    if (e.key === 'Escape') { closePop(); sel = null; hideCut(true); sync(); }
+    if (e.key === 'Escape') { closePop(); sel = null; picked.clear(); boxMode = false; hideCut(true); sync(); }
   });
   document.addEventListener('paste', async e => {
     if (!visible || typing(e.target)) return;
@@ -757,7 +800,7 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
   }
   function openMap(map) {
     m = map;
-    sel = null; linkFrom = null;
+    sel = null; linkFrom = null; picked.clear();
     hideCut(true);
     for (const el of els.values()) el.remove();
     els.clear(); players.clear();
@@ -770,6 +813,7 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
     const b = e.target.closest('button');
     if (!b) return;
     const act = b.dataset.act, add = b.dataset.add;
+    if (act === 'box') { boxMode = !boxMode; if (!boxMode) picked.clear(); return sync(); }
     if (act === 'new') { openMap(newMap('Карта ' + (maps.length + 1))); save(); }
     if (act === 'rename') openPop(b, `<input class="field" value="${esc(m.name)}" maxlength="60" aria-label="Название карты">`, p => {
       const inp = p.querySelector('input');
@@ -850,7 +894,7 @@ function initMap(root, { api, esc, nameOf, getNotes, openNote }) {
       visible = false;
       closePop();
       fmtEl.classList.remove('show');
-      linkFrom = null; actEl.classList.remove('show');
+      linkFrom = null; boxMode = false; picked.clear(); actEl.classList.remove('show');
       for (const n of m ? m.nodes : []) if (isMedia(n) && ps(n.id).playing) ctl(n, 'pause'); // ушёл с карты — видео на паузу
     },
   };

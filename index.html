@@ -404,10 +404,17 @@
   @media (pointer: coarse) { .m-act.show { display: flex; } }
   .m-act button { height: 38px; padding: 0 12px; border: 0; border-radius: 10px; background: rgba(255,255,255,.1); color: #fff; font-size: 14px; white-space: nowrap; cursor: pointer; }
   .m-act button[data-m="del"].armed { background: rgba(255,90,120,.45); }
-  .m-act .m-act-hint { display: none; padding: 0 6px; font-size: 13px; }
-  .m-act.linking [data-m="link"], .m-act.linking [data-m="edit"], .m-act.linking [data-m="del"],
-  .m-act:not(.linking) [data-m="cancel"], .m-act.edge [data-m="link"], .m-act.edge [data-m="edit"] { display: none; }
-  .m-act.linking .m-act-hint { display: block; }
+  .m-act .m-act-hint { display: none; padding: 0 6px; font-size: 13px; min-width: 0; }
+  /* что показывать в каждом режиме: одна карточка / связь / «Связать» / рамка / несколько выбранных */
+  .m-act button { display: none; }
+  .m-act[data-mode="node"] button:not([data-m="cancel"]), .m-act[data-mode="edge"] [data-m="del"],
+  .m-act[data-mode="linking"] [data-m="cancel"], .m-act[data-mode="boxing"] [data-m="cancel"],
+  .m-act[data-mode="multi"] [data-m="del"], .m-act[data-mode="multi"] [data-m="cancel"] { display: inline-block; }
+  .m-act[data-mode="linking"] .m-act-hint, .m-act[data-mode="boxing"] .m-act-hint, .m-act[data-mode="multi"] .m-act-hint { display: block; }
+  /* рамка выделения */
+  .m-box { position: absolute; z-index: 4; display: none; pointer-events: none; border: 1px dashed rgba(124,200,255,.9); background: rgba(124,200,255,.1); border-radius: 4px; }
+  .m-stage.boxing { cursor: crosshair; }
+  .m-tools button.on { background: rgba(124,200,255,.3); border-color: rgba(124,200,255,.6); }
   .m-stage.linking .mn { outline: 2px dashed rgba(124,200,255,.55); outline-offset: 3px; }
   .m-stage.linking .mn.link-from { outline: 3px solid rgba(124,200,255,.95); }
   /* пока тянешь или двигаешь карту — она отдельный слой видеокарты: кадр не перерисовывается целиком.
